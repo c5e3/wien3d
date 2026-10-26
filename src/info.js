@@ -4,7 +4,7 @@ import { structureAt } from './structures.js';
 import { featureLabel } from './poi.js';
 import { t, tText, locale } from './i18n.js';
 
-// Crosshair picking + info popups for buildings, bridges/tunnels, trees and POIs.
+// Crosshair picking + info popups for buildings, bridges/tunnels, trees, POIs and Wiener Linien vehicles.
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
 const PICK_RANGE = 600;
 
@@ -131,6 +131,22 @@ function riesenradHtml() {
   );
 }
 
+function vehicleHtml(d) {
+  const m = d.live === null ? null : Math.round(d.live / 60);
+  const status = m === null ? tText('tr.sched') : m === 0 ? tText('tr.onTime') : m > 0 ? tText('tr.late', { n: m }) : tText('tr.early', { n: -m });
+  return (
+    `<h2>${esc(tText('tr.mode.' + d.mode))} ${esc(d.line)}</h2>` +
+    rows([
+      [tText('tr.towards'), d.towards],
+      [tText('tr.next'), d.next],
+      [tText('tr.vehicle'), d.vehicle],
+      [tText('tr.status'), status],
+    ]) +
+    (d.fallbackDay ? `<p class="muted">${t('tr.fallback', { d: d.fallbackDay.toLocaleDateString(locale(), { timeZone: 'UTC' }) })}</p>` : '') +
+    `<p class="muted">${t('tr.note')}</p>`
+  );
+}
+
 function structureHtml(s, point, terrain) {
   const g = terrain.heightAt(point.x, point.z);
   return (
@@ -152,6 +168,7 @@ export class InfoUI {
     this.pois = pois;
     this.terrain = terrain;
     this.extra = []; // pickable models outside the chunks (Riesenrad)
+    this.transit = null; // moving vehicles (transit.js)
     this.ray = new THREE.Raycaster();
     this.ray.far = PICK_RANGE;
     this.ray.firstHitOnly = true;
@@ -170,7 +187,7 @@ export class InfoUI {
   }
 
   targets() {
-    const objs = [...this.extra];
+    const objs = [...this.extra, ...(this.transit?.pickables() ?? [])];
     for (const c of this.chunks.chunks.values())
       if (c.dist <= 4) c.group.traverse((o) => o.userData.pick && objs.push(o));
     return objs;
@@ -203,6 +220,12 @@ export class InfoUI {
     const kind = hit.object.userData.pick;
     if (kind === 'ground') return null;
     if (kind === 'riesenrad') return { kind, label: tText('rr.name') };
+    if (kind === 'vehicle') {
+      const inst = hit.object.userData.owners[hit.instanceId];
+      if (!inst) return null;
+      const d = this.transit.describe(inst);
+      return { kind, label: `${d.line} → ${d.towards}`, d };
+    }
     if (kind === 'tree') {
       const p = hit.object.userData.items[hit.instanceId]?.props || {};
       return { kind, label: tText('aim.tree', { name: p.GATTUNG_ART || '?' }), props: p };
@@ -232,6 +255,8 @@ export class InfoUI {
       this.body.innerHTML = `<div class="kicker">${esc(hit.poi.layer.title)}</div><h2>${brHtml(featureLabel(hit.poi.feat.props, hit.poi.layer))}</h2>` + allProps(hit.poi.feat.props);
     } else if (hit.kind === 'riesenrad') {
       this.body.innerHTML = `<div class="kicker">${t('rr.kicker')}</div>` + riesenradHtml();
+    } else if (hit.kind === 'vehicle') {
+      this.body.innerHTML = `<div class="kicker">${t(hit.d.mode === 4 ? 'tr.kickerWlb' : 'tr.kicker')}</div>` + vehicleHtml(hit.d);
     } else if (hit.kind === 'tree') {
       this.body.innerHTML = `<div class="kicker">${t('info.trees')}</div>` + treeHtml(hit.props);
     } else if (hit.kind === 'structure') {

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import { convertSheet, SHEET_RE } from './server/lod2.js';
+import { monitor, parseStops } from './server/wl-monitor.js';
 
 // Dev-server twin of api/lod2/[sheet].js, with a disk cache in .cache/lod2.
 function lod2Dev() {
@@ -32,4 +33,24 @@ function lod2Dev() {
   };
 }
 
-export default defineConfig({ plugins: [lod2Dev()] });
+// Dev-server twin of api/wl/monitor.js.
+function monitorDev() {
+  return {
+    name: 'wl-monitor-dev',
+    configureServer(server) {
+      server.middlewares.use('/api/wl/monitor', async (req, res) => {
+        const ids = parseStops(new URL(req.url, 'http://x').searchParams.get('stops'));
+        if (!ids) return (res.statusCode = 400), res.end('bad stops');
+        try {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(await monitor(ids));
+        } catch (e) {
+          res.statusCode = 502;
+          res.end(String(e.message || e));
+        }
+      });
+    },
+  };
+}
+
+export default defineConfig({ plugins: [lod2Dev(), monitorDev()] });

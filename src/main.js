@@ -8,6 +8,7 @@ import { PoiManager } from './poi.js';
 import { InfoUI } from './info.js';
 import { TouchControls } from './touch.js';
 import { Riesenrad } from './riesenrad.js';
+import { Transit } from './transit.js';
 import { Gamepads, BTN } from './gamepad.js';
 import { Settings, viewDistance } from './settings.js';
 import { setLang, setResolver, refresh, tText } from './i18n.js';
@@ -38,6 +39,8 @@ const pois = new PoiManager({ scene, terrain, player, chunks });
 const info = new InfoUI({ camera, chunks, pois, terrain });
 const riesenrad = new Riesenrad({ scene, terrain });
 info.extra = riesenrad.pickables;
+const transit = new Transit({ scene, terrain, player });
+info.transit = transit;
 
 // ---- landmarks (keys 1-9): name, lat, lon, height above ground, yaw, pitch -------------------
 const PLACES = [
@@ -285,6 +288,7 @@ function applySetting(k, v) {
     camera.far = far * 2.3;
     camera.updateProjectionMatrix();
     pois.setRange(far);
+    transit.setRange(far);
   } else if (k === 'resolution') renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * v);
   else if (k === 'fov') player.baseFov = v;
   else if (k === 'speed') player.speedIdx = v;
@@ -294,6 +298,7 @@ function applySetting(k, v) {
   else if (k === 'padSwapSticks') gamepads.swapSticks = v;
   else if (k === 'touchDragView') touch.dragView = v;
   else if (k === 'touchSpreadToApproach') touch.spreadToApproach = v;
+  else if (k === 'transit') transit.setEnabled(v);
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
 }
 // the menu's control lists show the inputs as currently set up
@@ -301,6 +306,7 @@ const CONTROL_KEYS = ['padSwapSticks', 'padInvertY', 'padSwapUpDown', 'touchDrag
 function controlText(key) {
   const s = settings.values;
   if (key === 'touch.1' && s.touchDragView) return ['touch.1.view'];
+  if (key === 'touch.fwd' && s.touchDragView) return ['touch.fwd.view'];
   if (key === 'touch.2' && s.touchSpreadToApproach) return ['touch.2.spread'];
   if (key === 'touch.3' && s.touchSpreadToApproach) return ['touch.3.pinch'];
   if (key === 'pad.1')
@@ -347,6 +353,9 @@ function updateHud(now) {
     `${g !== null && !Number.isNaN(p.y) ? ' · ' + tText('hud.above', { h: (p.y - g).toFixed(1) }) : ''}<br>` +
     `${mode}${player.sprinting ? ' · Sprint' : ''} · ${tText('hud.speed')} ×${player.speedMult}<br>` +
     `${tText('hud.buildings')}: ${chunks.stats.buildings} · ${tText('hud.loading')}: ${chunks.pending}` +
+    (settings.get('transit')
+      ? `<br>${tText('hud.transit', { n: transit.stats.vehicles, live: transit.stats.live })}${transit.stats.liveOk === false ? ' · ' + tText('hud.liveOff') : ''}`
+      : '') +
     (gamepads.current ? `<br>Controller: ${gamepads.current.id.replace(/[<&]/g, '')} (${gamepads.current.mapping || tText('hud.nonstandard')})` : '');
   if (now - hashT > 2000 && !Number.isNaN(p.y)) {
     hashT = now;
@@ -365,6 +374,7 @@ function frame(now) {
   player.update(dt);
   chunks.update(player.pos);
   riesenrad.update(dt);
+  transit.update(dt);
   pois.update(dt);
   info.update(dt, player.active || shot);
   updateHud(now);
@@ -373,4 +383,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__wien = { player, chunks, terrain, camera, pois, info, riesenrad };
+window.__wien = { player, chunks, terrain, camera, pois, info, riesenrad, transit };
