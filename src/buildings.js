@@ -4,7 +4,7 @@ import { lonLatToWorld, WIENER_NULL } from './geo.js';
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
 
 export async function fetchWfs(typeName, props, bbox, signal) {
-  const url = `${WFS}&typeName=${typeName}&propertyName=${props}&bbox=${bbox.join(',')},EPSG:4326`;
+  const url = `${WFS}&typeName=${typeName}${props ? `&propertyName=${props}` : ''}&bbox=${bbox.join(',')},EPSG:4326`;
   const r = await fetch(url, { signal });
   if (!r.ok) throw new Error(`WFS ${typeName} ${r.status}`);
   return (await r.json()).features || [];
@@ -131,7 +131,7 @@ export function buildTrees(features, b, terrain) {
     const cc = f.properties.KRONENDURCHMESSER || 2;
     const h = Math.max(2.5, hc * 5 - 2);
     const d = Math.min(Math.max(1.5, cc * 3 - 1), h * 0.9);
-    items.push({ x, z, g, h, d });
+    items.push({ x, z, g, h, d, props: f.properties });
   }
   if (!items.length) return null;
 
@@ -153,6 +153,7 @@ export function buildTrees(features, b, terrain) {
   trunks.computeBoundingSphere();
   crowns.computeBoundingSphere();
   const group = new THREE.Group();
+  trunks.userData = crowns.userData = { pick: 'tree', items };
   group.add(trunks, crowns);
   group.userData.dispose = () => {
     trunks.dispose();

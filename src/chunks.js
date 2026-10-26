@@ -4,6 +4,17 @@ import { fetchWfs, buildBuildings, buildTrees } from './buildings.js';
 import { structuresReady, buildStructures, tunnelPolygons, sideMaterial } from './structures.js';
 import polygonClipping from 'polygon-clipping';
 import { lod2Buildings, buildLod2 } from './lod2.js';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// BVH-accelerated raycasting for picking on the big merged meshes
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+function pickable(mesh, kind) {
+  mesh.geometry.computeBoundsTree();
+  mesh.userData.pick = kind;
+  return mesh;
+}
 
 // A chunk is one z16 web-mercator tile (~407 m wide in Vienna).
 export const CZ = 16;
@@ -174,6 +185,7 @@ class Chunk {
     g.setIndex(cut.idx);
     g.computeVertexNormals();
     this.ground = new THREE.Mesh(g, this.material);
+    this.ground.userData.pick = 'ground';
     this.group.add(this.ground);
   }
 
@@ -220,24 +232,24 @@ class Chunk {
     const signal = this.abort.signal;
     const [bk, trees, l2] = await Promise.all([
       fetchWfs('ogdwien:FMZKBKMOGD', 'O_KOTE,U_KOTE,T_KOTE,SHAPE', bbox, signal),
-      fetchWfs('ogdwien:BAUMKATOGD', 'BAUMHOEHE,KRONENDURCHMESSER,SHAPE', bbox, signal).catch(() => []),
+      fetchWfs('ogdwien:BAUMKATOGD', null, bbox, signal).catch(() => []),
       lod2Buildings(bbox, signal).catch(() => []),
       this.mgr.terrain.ensure(this.b),
     ]);
     if (this.disposed) return;
     const lod2 = buildLod2(l2, this.b);
-    if (lod2.geometry) this.group.add((this.lod2 = new THREE.Mesh(lod2.geometry, this.material)));
+    if (lod2.geometry) this.group.add((this.lod2 = pickable(new THREE.Mesh(lod2.geometry, this.material), 'building')));
     const { geometry, prisms, count } = buildBuildings(bk, this.b, this.mgr.terrain, lod2.covered);
     this.count = count + lod2.count;
     prisms.push(...lod2.prisms);
     await structuresReady;
     if (this.disposed) return;
     const st = buildStructures(this.b, this.mgr.terrain);
-    if (st.top) this.group.add((this.structTop = new THREE.Mesh(st.top, this.material)));
-    if (st.side) this.group.add((this.structSide = new THREE.Mesh(st.side, sideMaterial)));
+    if (st.top) this.group.add((this.structTop = pickable(new THREE.Mesh(st.top, this.material), 'structure')));
+    if (st.side) this.group.add((this.structSide = pickable(new THREE.Mesh(st.side, sideMaterial), 'structure')));
     prisms.push(...st.prisms);
     if (geometry) {
-      this.buildings = new THREE.Mesh(geometry, this.material);
+      this.buildings = pickable(new THREE.Mesh(geometry, this.material), 'building');
       this.group.add(this.buildings);
     }
     this.prisms = prisms;

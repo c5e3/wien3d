@@ -4,6 +4,8 @@ import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
 import { ChunkManager } from './chunks.js';
 import { Player } from './player.js';
+import { PoiManager } from './poi.js';
+import { InfoUI } from './info.js';
 
 const SKY = 0xb8d3ea;
 
@@ -27,6 +29,8 @@ const terrain = new Terrain();
 const collision = new Collision();
 const chunks = new ChunkManager({ scene, terrain, collision, renderer });
 const player = new Player(camera, renderer.domElement, terrain, collision);
+const pois = new PoiManager({ scene, terrain, player });
+const info = new InfoUI({ camera, chunks, pois, terrain });
 
 // ---- landmarks (keys 1-9) -------------------------------------------------------------------
 const PLACES = [
@@ -67,8 +71,66 @@ if (hash.length >= 2 && hash.every(Number.isFinite)) {
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
 overlay.addEventListener('click', () => player.lock());
-if (new URLSearchParams(location.search).has('shot')) overlay.classList.add('hidden');
-player.onToggle = (locked) => overlay.classList.toggle('hidden', locked);
+const params = new URLSearchParams(location.search);
+const shot = params.has('shot');
+if (shot) overlay.classList.add('hidden');
+// Mouse mode (M): controls off, normal cursor (click links, select text); M or a click into the scene resumes.
+let mouseMode = false;
+const crosshair = document.getElementById('crosshair');
+const mouseHint = document.getElementById('mouse-mode');
+function setMouseMode(on) {
+  mouseMode = on;
+  mouseHint.classList.toggle('hidden', !on);
+  crosshair.classList.toggle('hidden', on);
+}
+player.onToggle = (locked) => {
+  if (locked) setMouseMode(false);
+  overlay.classList.toggle('hidden', locked || pois.open || mouseMode || shot);
+};
+
+// P: POI browser (releases the mouse), click: info about what the crosshair points at, X: close info
+function closePois() {
+  pois.hide();
+  player.lock();
+}
+document.getElementById('poi-close').addEventListener('click', closePois);
+document.addEventListener('keydown', (e) => {
+  if (player.locked) {
+    if (e.code === 'KeyP') {
+      pois.show();
+      document.exitPointerLock();
+    } else if (e.code === 'KeyM') {
+      setMouseMode(true);
+      document.exitPointerLock();
+    } else if (e.code === 'KeyX') info.close();
+  } else if (pois.open && (e.code === 'Escape' || (e.code === 'KeyP' && document.activeElement !== pois.search))) {
+    e.preventDefault();
+    if (e.code === 'Escape') {
+      pois.hide();
+      overlay.classList.remove('hidden');
+    } else closePois();
+  } else if (mouseMode) {
+    if (e.code === 'KeyM') player.lock();
+    else if (e.code === 'KeyX') info.close();
+    else if (e.code === 'Escape') {
+      setMouseMode(false);
+      overlay.classList.remove('hidden');
+    }
+  }
+});
+document.addEventListener('mousedown', (e) => {
+  if (player.locked && e.button === 0) info.click();
+  else if (e.button === 2 && (player.locked || mouseMode)) info.close();
+});
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+// in mouse mode a click into the 3D view (not on a panel or link) returns to play mode
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (mouseMode && e.button === 0) player.lock();
+});
+// screenshot/debug helpers: ?poi=MUSEUMOGD,SEHENSWUERDIGOGD  &info (click after load)
+if (params.get('poi')) pois.ready.then(() => params.get('poi').split(',').forEach((id) => pois.toggle(id, true)));
+if (params.has('info')) setTimeout(() => info.click(), 20000);
+if (params.has('panel')) setTimeout(() => pois.show(), 5000);
 window.addEventListener('beforeunload', (e) => {
   // guard against Ctrl+W while sprinting with Ctrl
   if (player.locked) e.preventDefault();
@@ -107,10 +169,12 @@ function frame(now) {
   last = now;
   player.update(dt);
   chunks.update(player.pos);
+  pois.update(dt);
+  info.update(dt, player.locked || shot);
   updateHud(now);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__wien = { player, chunks, terrain, camera };
+window.__wien = { player, chunks, terrain, camera, pois, info };

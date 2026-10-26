@@ -41,7 +41,20 @@ function prepare(s) {
     const [px, pz] = lonLatToWorld(lon, lat);
     return { x: px, z: pz, top, w, d };
   });
-  return { name: s.n, op: s.op, kind: s.k, clear: s.c, open: new Set(s.open || []), tris: s.t, x, z, a, b, rings, piers, ang, minX, maxX, minZ, maxZ };
+  return { name: s.n, op: s.op, id: s.id, len: s.len, kind: s.k, clear: s.c, open: new Set(s.open || []), tris: s.t, x, z, a, b, rings, piers, ang, minX, maxX, minZ, maxZ };
+}
+
+/** Structure whose footprint contains (x, z), or null. */
+export function structureAt(x, z) {
+  for (const s of list) {
+    if (x < s.minX - 1 || x > s.maxX + 1 || z < s.minZ - 1 || z > s.maxZ + 1) continue;
+    let inside = false;
+    for (const [i0, i1] of s.rings)
+      for (let i = i0, j = i1 - 1; i < i1; j = i++)
+        if (s.z[i] > z !== s.z[j] > z && x < ((s.x[j] - s.x[i]) * (z - s.z[i])) / (s.z[j] - s.z[i]) + s.x[i]) inside = !inside;
+    if (inside) return s;
+  }
+  return null;
 }
 
 const overlaps = (s, bd, pad = 0) => s.maxX >= bd.xMin - pad && s.minX <= bd.xMax + pad && s.maxZ >= bd.zMin - pad && s.minZ <= bd.zMax + pad;

@@ -22,15 +22,52 @@
       kbd, .cols b { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px; border-radius: 4px; background: #39404a; text-align: center; font: 12px/20px ui-monospace, Consolas, monospace; }
       .start { margin-top: 20px; font-size: 18px; font-weight: 600; text-align: center; color: #9fd3ff; }
       .credits { margin-top: 14px; font-size: 11px; color: #889; }
+      .hidden { display: none !important; }
+      #aim-label { position: fixed; left: 50%; top: calc(50% + 18px); transform: translateX(-50%); color: #fff; font: 13px system-ui, sans-serif; text-shadow: 1px 1px 2px #000; pointer-events: none; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+      .card { position: fixed; background: #1b1f24ee; color: #e8eaed; border-radius: 10px; box-shadow: 0 10px 40px #0007; font-size: 13px; }
+      .card h2 { margin: 2px 0 10px; font-size: 18px; }
+      .card h3 { margin: 14px 0 6px; font-size: 13px; color: #9fd3ff; text-transform: uppercase; letter-spacing: .04em; }
+      .card a { color: #9fd3ff; }
+      .card .muted { color: #8a919b; }
+      .card .kicker { font-size: 11px; color: #9fd3ff; text-transform: uppercase; letter-spacing: .06em; }
+      .card table { border-collapse: collapse; width: 100%; }
+      .card th { text-align: left; font-weight: 500; color: #aab2bd; padding: 3px 10px 3px 0; vertical-align: top; white-space: nowrap; }
+      .card td { padding: 3px 0; overflow-wrap: anywhere; }
+      .card ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+      .close { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #aab; font-size: 20px; cursor: pointer; }
+      #info-panel { right: 16px; top: 16px; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 16px 18px; }
+      #mouse-mode { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #1b1f24dd; color: #e8eaed; padding: 7px 14px; border-radius: 8px; font-size: 13px; pointer-events: none; }
+      #poi-panel { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); height: min(640px, calc(100vh - 32px)); display: flex; flex-direction: column; padding: 18px 20px; }
+      #poi-panel header { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+      #poi-panel h2 { margin: 0; flex: 1; }
+      #poi-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; border: 1px solid #39404a; background: #111418; color: #e8eaed; font-size: 14px; margin-bottom: 8px; }
+      #poi-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+      #poi-list li label { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
+      #poi-list li label:hover { background: #2a3038; }
+      #poi-list .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+      #poi-list .cnt { margin-left: auto; color: #8a919b; font-size: 12px; white-space: nowrap; }
+      .btn { background: #39404a; color: #e8eaed; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+      .btn:hover { background: #4a525e; }
     </style>
   </head>
   <body>
     <div id="crosshair"></div>
+    <div id="aim-label"></div>
+    <div id="mouse-mode" class="hidden">Maus-Modus · <kbd>M</kbd> oder Klick in die Szene zum Weiterspielen</div>
     <div id="hud"></div>
+    <div id="info-panel" class="card hidden">
+      <button id="info-close" class="close" title="Close (X)">×</button>
+      <div id="info-body"></div>
+    </div>
+    <div id="poi-panel" class="card hidden">
+      <header><h2>Orte &amp; POIs (OGD Wien)</h2><button id="poi-clear" class="btn">Alle aus</button><button id="poi-close" class="btn">Schließen (P)</button></header>
+      <input id="poi-search" type="search" placeholder="Suchen… (z. B. Museum, Trinkbrunnen, Kunstwerke)" autocomplete="off" />
+      <ul id="poi-list"></ul>
+    </div>
     <div id="overlay">
       <div class="panel">
         <h1>Wien 3D</h1>
-        <p class="sub">Open Government Data Vienna &amp; Austria · creative mode</p>
+        <p class="sub">Open Government Data Vienna &amp; Austria</p>
         <div class="cols">
           <ul>
             <li><kbd>W A S D</kbd> move</li>
@@ -41,6 +78,8 @@
             <li><kbd>W</kbd><kbd>W</kbd> / <kbd>Ctrl</kbd> / <kbd>R</kbd> sprint</li>
             <li><kbd>Wheel</kbd> speed multiplier</li>
             <li><kbd>N</kbd> noclip (spectator)</li>
+            <li><kbd>P</kbd> POI list · <kbd>Click</kbd> info · <kbd>X</kbd>/<kbd>Right-click</kbd> close info</li>
+            <li><kbd>M</kbd> mouse mode (free cursor)</li>
             <li><kbd>Esc</kbd> pause</li>
           </ul>
           <ul id="places"></ul>

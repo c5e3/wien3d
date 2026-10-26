@@ -299,7 +299,7 @@ for (const f of uniq.values()) {
       }
       structure.open = open;
     }
-    structures.push({ n: name, op, ...structure, v, r, t: tris });
+    structures.push({ n: name, op, id: p.OBJEKTNUMMER || null, len: p.LAENGE || null, ...structure, v, r, t: tris });
     stats.ops[op] = (stats.ops[op] || 0) + 1;
   }
 }
