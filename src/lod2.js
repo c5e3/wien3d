@@ -74,9 +74,8 @@ export async function lod2Buildings(bbox, signal) {
  * (2 m raster of all LOD2 roofs touching the chunk) used to drop the older block-model parts they replace.
  */
 export function buildLod2(buildings, b) {
-  const pos = [], uv = [], prisms = [];
+  const pos = [], prisms = [];
   let count = 0;
-  const U = (x) => (x - b.xMin) / b.size, V = (z) => 1 - (z - b.zMin) / b.size;
   const CELL = 2, PAD = 60;
   const gw = Math.ceil((b.size + 2 * PAD) / CELL);
   const cover = new Uint8Array(gw * gw);
@@ -106,7 +105,6 @@ export function buildLod2(buildings, b) {
       }
       if (!mine) continue;
       pos.push(x0, y0, z0, x1, y1, z1, x2, y2, z2);
-      uv.push(U(x0), V(z0), U(x1), V(z1), U(x2), V(z2));
       // collision: prism from the ground up to the roof plane
       if (Math.abs(d) < 0.01) continue;
       // plane y = A x + B z + C through the three vertices
@@ -123,9 +121,7 @@ export function buildLod2(buildings, b) {
     }
     if (!mine) continue;
     for (let k = bd.wallStart; k < bd.end; k++) {
-      const x = w[k * 3], z = w[k * 3 + 2];
-      pos.push(x, w[k * 3 + 1], z);
-      uv.push(U(x), V(z));
+      pos.push(w[k * 3], w[k * 3 + 1], w[k * 3 + 2]);
     }
   }
 
@@ -137,8 +133,6 @@ export function buildLod2(buildings, b) {
   if (pos.length) {
     geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geometry.computeVertexNormals();
   }
   return { geometry, prisms, covered, count };
 }

@@ -77,15 +77,11 @@ export const sideMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, 
  * Triangles/edges are assigned to the chunk containing their centre so long bridges split cleanly.
  */
 export function buildStructures(bd, terrain) {
-  const top = { pos: [], uv: [] };
+  const top = [];
   const side = { pos: [], col: [] };
   const prisms = [];
   const inChunk = (x, z) => x >= bd.xMin && x < bd.xMax && z >= bd.zMin && z < bd.zMax;
-  const U = (x) => (x - bd.xMin) / bd.size, V = (z) => 1 - (z - bd.zMin) / bd.size;
-  const topTri = (x0, y0, z0, x1, y1, z1, x2, y2, z2) => {
-    top.pos.push(x0, y0, z0, x1, y1, z1, x2, y2, z2);
-    top.uv.push(U(x0), V(z0), U(x1), V(z1), U(x2), V(z2));
-  };
+  const topTri = (...v) => top.push(...v);
   const sideTri = (c, x0, y0, z0, x1, y1, z1, x2, y2, z2) => {
     side.pos.push(x0, y0, z0, x1, y1, z1, x2, y2, z2);
     for (let i = 0; i < 3; i++) side.col.push(c.r, c.g, c.b);
@@ -188,9 +184,12 @@ export function buildStructures(bd, terrain) {
     if (!pos.length) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute(name, new THREE.Float32BufferAttribute(attr, size));
-    g.computeVertexNormals();
+    if (attr) {
+      g.setAttribute(name, new THREE.Float32BufferAttribute(attr, size));
+      g.computeVertexNormals();
+    }
     return g;
   };
-  return { top: geo(top.pos, top.uv, 'uv', 2), side: geo(side.pos, side.col, 'color', 3), prisms };
+  // top: uv + normals are added by Chunk.orthoMesh
+  return { top: geo(top), side: geo(side.pos, side.col, 'color', 3), prisms };
 }

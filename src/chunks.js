@@ -111,6 +111,73 @@ function cutTunnels(pos, uv, idx, b) {
   return { pos: P, uv: UV, idx: out };
 }
 
+/** Keep the part of a convex polygon (list of [x, y, z]) with s * (p[axis] - v) >= 0. */
+function clipPoly(poly, axis, v, s) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    const da = s * (a[axis] - v), dc = s * (c[axis] - v);
+    if (da >= 0) out.push(a);
+    if (da < 0 !== dc < 0) {
+      const f = da / (da - dc);
+      out.push([a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f, a[2] + (c[2] - a[2]) * f]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Buildings are owned by the chunk holding their centroid but may reach into neighbouring tiles, where this
+ * chunk's ortho texture would only repeat its clamped edge pixels. Clip a triangle soup at the tile edges and
+ * give every piece the uv of the tile it lies in, one geometry group per tile; `cells` are the tile offsets.
+ */
+function splitByTile(src, b) {
+  const p = src.attributes.position.array;
+  const cells = new Map(); // "dx,dy" -> positions
+  const out = (dx, dy) => {
+    const k = `${dx},${dy}`;
+    let a = cells.get(k);
+    if (!a) cells.set(k, (a = []));
+    return a;
+  };
+  const cx = (x) => Math.floor((x - b.xMin) / b.size), cz = (z) => Math.floor((z - b.zMin) / b.size);
+  for (let t = 0; t < p.length; t += 9) {
+    const x0 = cx(Math.min(p[t], p[t + 3], p[t + 6])), x1 = cx(Math.max(p[t], p[t + 3], p[t + 6]));
+    const z0 = cz(Math.min(p[t + 2], p[t + 5], p[t + 8])), z1 = cz(Math.max(p[t + 2], p[t + 5], p[t + 8]));
+    if (x0 === x1 && z0 === z1) {
+      for (let i = 0; i < 9; i++) out(x0, z0).push(p[t + i]);
+      continue;
+    }
+    const tri = [[p[t], p[t + 1], p[t + 2]], [p[t + 3], p[t + 4], p[t + 5]], [p[t + 6], p[t + 7], p[t + 8]]];
+    for (let dy = z0; dy <= z1; dy++)
+      for (let dx = x0; dx <= x1; dx++) {
+        const xa = b.xMin + dx * b.size, za = b.zMin + dy * b.size;
+        let poly = clipPoly(tri, 0, xa, 1);
+        poly = clipPoly(poly, 0, xa + b.size, -1);
+        poly = clipPoly(poly, 2, za, 1);
+        poly = clipPoly(poly, 2, za + b.size, -1);
+        for (let i = 1; i + 1 < poly.length; i++) out(dx, dy).push(...poly[0], ...poly[i], ...poly[i + 1]);
+      }
+  }
+  let n = 0;
+  for (const a of cells.values()) n += a.length / 3;
+  const pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), list = [];
+  const g = new THREE.BufferGeometry();
+  let v = 0;
+  for (const [k, a] of cells) {
+    const [dx, dy] = k.split(',').map(Number);
+    const xa = b.xMin + dx * b.size, za = b.zMin + dy * b.size;
+    g.addGroup(v, a.length / 3, list.length);
+    pos.set(a, v * 3);
+    for (let i = 0; i < a.length; i += 3, v++) (uv[v * 2] = (a[i] - xa) / b.size), (uv[v * 2 + 1] = 1 - (a[i + 2] - za) / b.size);
+    list.push([dx, dy]);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.computeVertexNormals(); // non-indexed => flat normals
+  return { geometry: g, cells: list };
+}
+
 class Chunk {
   constructor(mgr, x, y) {
     this.mgr = mgr;
@@ -247,6 +314,17 @@ class Chunk {
     this.material.needsUpdate = true;
   }
 
+  /**
+   * Mesh textured with the ortho of whichever tile each part lies in. Neighbour chunks outlive our buildings
+   * (ground reaches TERRAIN_EXTRA further), so borrowing their materials is safe.
+   */
+  orthoMesh(geometry) {
+    const { geometry: g, cells } = splitByTile(geometry, this.b);
+    geometry.dispose();
+    const mats = cells.map(([dx, dy]) => this.mgr.chunks.get(`${this.x + dx},${this.y + dy}`)?.material ?? this.material);
+    return new THREE.Mesh(g, mats);
+  }
+
   async loadBuildings(signal) {
     const bbox = tileLonLatBBox(CZ, this.x, this.y);
     const [bk, trees, l2] = await Promise.all([
@@ -259,15 +337,15 @@ class Chunk {
     if (signal.aborted) return;
     const g = new THREE.Group();
     const lod2 = buildLod2(l2, this.b);
-    if (lod2.geometry) g.add(pickable(new THREE.Mesh(lod2.geometry, this.material), 'building'));
+    if (lod2.geometry) g.add(pickable(this.orthoMesh(lod2.geometry), 'building'));
     const { geometry, prisms, count } = buildBuildings(bk, this.b, this.mgr.terrain, lod2.covered);
     this.count = count + lod2.count;
     prisms.push(...lod2.prisms);
     const st = buildStructures(this.b, this.mgr.terrain);
-    if (st.top) g.add(pickable(new THREE.Mesh(st.top, this.material), 'structure'));
+    if (st.top) g.add(pickable(this.orthoMesh(st.top), 'structure'));
     if (st.side) g.add(pickable(new THREE.Mesh(st.side, sideMaterial), 'structure'));
     prisms.push(...st.prisms);
-    if (geometry) g.add(pickable(new THREE.Mesh(geometry, this.material), 'building'));
+    if (geometry) g.add(pickable(this.orthoMesh(geometry), 'building'));
     this.prisms = prisms;
     this.mgr.collision.add(prisms);
     const t = buildTrees(trees, this.b, this.mgr.terrain);

@@ -17,14 +17,8 @@ export async function fetchWfs(typeName, props, bbox, signal) {
  */
 export function buildBuildings(features, b, terrain, covered = () => false) {
   const pos = [];
-  const uv = [];
   const prisms = [];
-  const U = (x) => (x - b.xMin) / b.size;
-  const V = (z) => 1 - (z - b.zMin) / b.size;
-  const vert = (x, y, z) => {
-    pos.push(x, y, z);
-    uv.push(U(x), V(z));
-  };
+  const vert = (x, y, z) => pos.push(x, y, z);
 
   for (const f of features) {
     const p = f.properties;
@@ -106,9 +100,6 @@ export function buildBuildings(features, b, terrain, covered = () => false) {
   if (!pos.length) return { geometry: null, prisms, count: prisms.length };
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geometry.computeVertexNormals(); // non-indexed => flat normals
-  geometry.computeBoundingSphere();
   return { geometry, prisms, count: prisms.length };
 }
 
