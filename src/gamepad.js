@@ -13,13 +13,8 @@ export class Gamepads {
     this.invertY = false;
     this.swapUpDown = false; // LB up, RB down
     this.swapSticks = false; // left-handed: look with the left stick, move with the right
-    // FPV drone (mode 2): left stick yaw / height, right stick roll sideways / fly forwards; no shoulder buttons
+    // FPV drone (mode 2): left stick yaw / height, right stick roll sideways / pitch; no shoulder buttons
     this.drone = false;
-  }
-
-  /** The stick whose click sprints: the one that flies forwards. */
-  get moveStick() {
-    return this.drone !== this.swapSticks ? BTN.RS : BTN.LS;
   }
 
   update(dt) {
@@ -46,12 +41,11 @@ export class Gamepads {
     const s = LOOK * p.lookSens * dt;
     if (this.drone) {
       const [t, r] = this.swapSticks ? [2, 0] : [0, 2]; // throttle / yaw stick, roll / pitch stick
-      const yaw = axis(t), lift = -axis(t + 1);
-      p.look(-Math.sign(yaw) * yaw * yaw * s, 0);
+      const yaw = axis(t), lift = -axis(t + 1), pitch = axis(r + 1) * (this.invertY ? -1 : 1);
+      p.look(-Math.sign(yaw) * yaw * yaw * s, -Math.sign(pitch) * pitch * pitch * s);
       p.pad.up = Math.max(0, lift);
       p.pad.down = Math.max(0, -lift);
       p.pad.str = p.pad.roll = axis(r);
-      p.pad.fwd = -axis(r + 1);
       return;
     }
     const [m, l] = this.swapSticks ? [2, 0] : [0, 2];

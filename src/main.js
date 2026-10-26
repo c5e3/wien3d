@@ -265,7 +265,7 @@ gamepads.onPress = (b) => {
     else if (b === BTN.LT || b === BTN.B) info.close();
     else if (b === BTN.Y) player.toggleNoclip();
     else if (b === BTN.UP || b === BTN.DOWN) player.changeSpeed(b === BTN.UP ? 1 : -1);
-    else if (b === gamepads.moveStick) player.sprinting = true; // click the stick that flies forwards
+    else if (b === (gamepads.swapSticks ? BTN.RS : BTN.LS)) player.sprinting = true; // click the moving stick
     else if (b === BTN.BACK) toggleStats();
     else if (b === BTN.LEFT || b === BTN.RIGHT) goTo((place + (b === BTN.RIGHT ? 1 : PLACES.length - 1)) % PLACES.length);
   }
@@ -305,9 +305,9 @@ function controlText(key) {
   if (key === 'touch.fwd' && s.touchDragView) return ['touch.fwd.view'];
   if (key === 'touch.2' && s.touchPinchToApproach) return ['touch.2.pinch'];
   if (key === 'touch.3' && s.touchPinchToApproach) return ['touch.3.spread'];
-  if (key === 'pad.1' && s.padDrone)
-    return ['pad.1.drone', { yaw: s.padSwapSticks ? 'R' : 'L', roll: s.padSwapSticks ? 'L' : 'R' }];
-  if (key === 'pad.2' && s.padDrone) return ['pad.2.drone', { sprint: s.padSwapSticks ? 'L3' : 'R3' }];
+  if (key === 'pad.1' && s.padDrone) return ['pad.1.drone', { yaw: s.padSwapSticks ? 'R' : 'L' }];
+  if (key === 'pad.2' && s.padDrone)
+    return ['pad.2.drone', { roll: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
   if (key === 'pad.1')
     return [key, { move: s.padSwapSticks ? 'R' : 'L', look: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
   if (key === 'pad.2')
