@@ -5,16 +5,18 @@ import * as THREE from 'three';
 //    (pointer acceleration)
 //  - pinching flies towards what the crosshair points at, spreading backs away; each step is a fraction of the
 //    distance to that point, so far targets come quickly and near ones gently
-//  - two fingers moving left / right together slide sideways, so the scene keeps pace with the fingers at the
-//    distance of what the crosshair points at (can be combined with pinching)
+//  - two fingers moving left / right together slide sideways, relative to how far away what the crosshair points
+//    at is, and scaled with the speed multiplier (can be combined with pinching)
 //  - two fingers moving up / down together fly forwards / backwards on the level, like W / S (unlike pinching,
 //    which flies along the view)
-//  - nothing moves on after the fingers stop or leave
+//  - nothing moves on after the fingers stop or leave; a finger left over from a two-finger gesture does nothing
+//    until all fingers are up
 //  - a tap opens the info box for the crosshair, a two-finger tap acts like Esc
 const LOOK = 0.0028; // rad per CSS px at gain 1
 const TAP_MS = 280;
 const TAP_PX = 12;
 const FALLBACK_DIST = 250; // pinching at the sky or beyond the pick range
+const PAN = 2; // two-finger slide / fly: scene moves this many times the finger travel at speed ×4
 
 export class TouchControls {
   constructor(dom, { player, camera, aimDistance, onTap, onTwoFingerTap }) {
@@ -87,7 +89,8 @@ export class TouchControls {
       if (Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) this.moved = true;
     }
     if (!this.player.active) return;
-    if (this.pts.size === 1) this.look(e.timeStamp);
+    // a finger left over from a two-finger gesture doesn't steer: fingers rarely lift at exactly the same time
+    if (this.pts.size === 1 && this.maxTouches === 1) this.look(e.timeStamp);
     else if (this.pts.size >= 2) this.pinch();
   }
 
@@ -120,17 +123,19 @@ export class TouchControls {
     const step = s < 1 ? dist * (1 - s ** g) : -dist * (s ** g - 1);
     this.pending += Math.max(-dist, Math.min(dist * 0.5, step));
 
-    // sideways: the screen width spans 2·dist·tan(hfov/2) at the target's distance
+    // sideways: the screen width spans 2·dist·tan(hfov/2) at the target's distance, times PAN at the default
+    // speed ×4, scaled along with the speed multiplier
+    const gain = (PAN * this.player.speedMult) / 4 * (this.dragView ? -1 : 1);
     const mid = (a.x + b.x) / 2;
     const cam = this.camera;
     const span = 2 * dist * Math.tan((cam.fov * Math.PI) / 360) * cam.aspect;
-    this.pendingSide += ((mid - this.midX) / window.innerWidth) * span * (this.dragView ? -1 : 1);
+    this.pendingSide += ((mid - this.midX) / window.innerWidth) * span * gain;
     this.midX = mid;
 
     // forwards / backwards: fingers up fly forwards, at the same pace as sliding sideways
     const midY = (a.y + b.y) / 2;
     const spanV = 2 * dist * Math.tan((cam.fov * Math.PI) / 360);
-    this.pendingFwd += ((this.midY - midY) / window.innerHeight) * spanV * (this.dragView ? -1 : 1);
+    this.pendingFwd += ((this.midY - midY) / window.innerHeight) * spanV * gain;
     this.midY = midY;
   }
 
@@ -139,7 +144,6 @@ export class TouchControls {
     for (const t of e.changedTouches) this.pts.delete(t.identifier);
     this.lookPrev = null;
     if (this.pts.size >= 2) this.beginPinch();
-    else if (this.pts.size === 1) this.anchorLook(e.timeStamp);
     if (this.pts.size) return;
     if (!this.moved && e.timeStamp - this.t0 < TAP_MS) {
       if (this.maxTouches === 1) this.onTap();
