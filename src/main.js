@@ -305,9 +305,9 @@ function controlText(key) {
   if (key === 'touch.fwd' && s.touchDragView) return ['touch.fwd.view'];
   if (key === 'touch.2' && s.touchPinchToApproach) return ['touch.2.pinch'];
   if (key === 'touch.3' && s.touchPinchToApproach) return ['touch.3.spread'];
-  if (key === 'pad.1' && s.padDrone) return ['pad.1.drone', { yaw: s.padSwapSticks ? 'R' : 'L' }];
-  if (key === 'pad.2' && s.padDrone)
-    return ['pad.2.drone', { roll: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
+  if (key === 'pad.1' && s.padDrone)
+    return ['pad.1.drone', { thr: s.padSwapSticks ? 'R' : 'L', rp: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
+  if (key === 'pad.2' && s.padDrone) return ['pad.2.drone'];
   if (key === 'pad.1')
     return [key, { move: s.padSwapSticks ? 'R' : 'L', look: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
   if (key === 'pad.2')

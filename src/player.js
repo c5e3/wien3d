@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Drone } from './drone.js';
 
 // Minecraft (Java) creative-mode flight, 1 block = 1 m. Always flying: at street level the data has no detail.
 const WIDTH_R = 0.3;
@@ -9,7 +10,6 @@ const SPEED_SCALE = 2; // Minecraft speeds feel slow at city scale
 const SPEED = Object.fromEntries(Object.entries({ fly: 10.92, flySprint: 21.78, flyVert: 7.5 }).map(([k, v]) => [k, v * SPEED_SCALE]));
 export const SPEED_STEPS = [1, 2, 4, 8, 16, 32, 64];
 const DOUBLE_TAP = 300;
-const MAX_ROLL = 0.35; // rad of bank at full sideways stick (drone controls)
 const EPS = 1e-3;
 
 // height of a prism's top at (x, z): flat, or a sloped roof plane clamped to the triangle's height range
@@ -31,8 +31,11 @@ export class Player {
     this.speedIdx = SPEED_STEPS.indexOf(4); // default ×4
     this.lookSens = 1; // multiplies mouse, touch and controller look
     this.keys = new Set();
-    this.pad = { fwd: 0, str: 0, up: 0, down: 0, roll: 0 }; // analog controller input, see gamepad.js
-    this.roll = 0; // drone controls bank the view while sliding sideways
+    // analog controller input, see gamepad.js; thr / yaw / pitch / roll for the drone
+    this.pad = { fwd: 0, str: 0, up: 0, down: 0, thr: 0, yaw: 0, pitch: 0, roll: 0 };
+    this.drone = new Drone();
+    this.droneOn = false; // gamepad.js: FPV drone controls with a controller connected
+    this.droneWas = false;
     this.touchVel = new THREE.Vector3(); // flight from pinch gestures, see touch.js
     this.touchSnap = false; // touch.js: velocity follows touchVel without easing (no drift after a pinch)
     this.baseFov = camera.fov;
@@ -119,16 +122,39 @@ export class Player {
     this.pos.set(x, NaN, z);
     this.pendingHeight = yAboveGround;
     this.vel.set(0, 0, 0);
+    this.droneWas = false; // the drone starts level, facing the new view
   }
 
   update(dt) {
-    const k = this.keys;
     if (Number.isNaN(this.pos.y)) {
       const g = this.terrain.heightAt(this.pos.x, this.pos.z);
       if (g === null) return this.syncCamera(dt);
       this.pos.y = g + this.pendingHeight;
     }
 
+    if (this.droneOn) {
+      if (!this.droneWas) this.drone.reset(this.yaw);
+      this.sprinting = false;
+      // paused in the menu: hang in the air
+      if (this.active) this.drone.update(dt, this.pad, this.vel, this.speedMult, this.onGround);
+      else this.vel.set(0, 0, 0);
+    } else this.fly(dt);
+    this.droneWas = this.droneOn;
+
+    // don't fall through ground that hasn't streamed in yet
+    if (this.terrain.heightAt(this.pos.x, this.pos.z) === null) this.vel.set(0, 0, 0);
+
+    const dist = this.vel.length() * dt;
+    const n = Math.min(80, Math.max(1, Math.ceil(dist / 0.2)));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) this.step(h);
+
+    this.syncCamera(dt);
+  }
+
+  /** Creative-mode flight from keys, sticks and touch. */
+  fly(dt) {
+    const k = this.keys;
     const pad = this.pad, tv = this.touchVel;
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
     const fwd = clamp1((k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) + pad.fwd);
@@ -149,23 +175,17 @@ export class Player {
     this.vel.x += (wx * sp + tv.x - this.vel.x) * a;
     this.vel.z += (wz * sp + tv.z - this.vel.z) * a;
     this.vel.y += ((upAmt - downAmt) * SPEED.flyVert * m + tv.y - this.vel.y) * a;
-
-    // don't fall through ground that hasn't streamed in yet
-    if (this.terrain.heightAt(this.pos.x, this.pos.z) === null) this.vel.set(0, 0, 0);
-
-    const dist = this.vel.length() * dt;
-    const n = Math.min(80, Math.max(1, Math.ceil(dist / 0.2)));
-    const h = dt / n;
-    for (let i = 0; i < n; i++) this.step(h);
-
-    this.syncCamera(dt);
   }
 
   syncCamera(dt) {
     const c = this.camera;
     c.position.set(this.pos.x, (Number.isNaN(this.pos.y) ? 400 : this.pos.y) + EYE, this.pos.z);
-    this.roll += (-this.pad.roll * MAX_ROLL - this.roll) * (1 - Math.exp(-dt * 6));
-    c.rotation.set(this.pitch, this.yaw, this.roll);
+    if (this.droneOn) {
+      // keep yaw / pitch in step for everything else (touch, the URL, leaving drone mode)
+      this.drone.camera(c.quaternion);
+      this.yaw = c.rotation.y;
+      this.pitch = c.rotation.x;
+    } else c.rotation.set(this.pitch, this.yaw, 0);
     const targetFov = this.baseFov * (this.sprinting ? 1.15 : 1);
     if (Math.abs(c.fov - targetFov) > 0.01) {
       c.fov += (targetFov - c.fov) * (1 - Math.exp(-dt * 10));
