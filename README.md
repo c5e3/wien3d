@@ -30,15 +30,16 @@ Click or tap anywhere, press any key or any controller button, and off you go.
 | --- | --- |
 | `W` `A` `S` `D` + mouse | fly & look around |
 | `Space` · `Shift` | fly up · fly down |
-| `W` `W`, `Ctrl` or `R` | sprint |
+| `W` `W` (double-tap), `Ctrl` or `R` | sprint |
 | Mouse wheel | speed multiplier |
 | `N` | noclip (ghost through walls) |
-| `1` – `9` | teleport to a landmark (Stephansdom, Prater, Schönbrunn, …) |
+| `1` – `9` | teleport to a landmark (Stephansdom, Prater, Schönbrunn, …), also straight from the start window |
 | `P` | POI browser |
-| Click / `X` | building info / close it |
-| `M` | mouse mode (free cursor) |
+| Click | info about what the crosshair points at |
+| `X` or right-click | close the info box |
+| `M` | mouse mode (free cursor, `M` or a click into the scene to continue) |
 | `C` | coordinates & stats |
-| `Esc` | close box / pause |
+| `Esc` | close box / show the start window |
 
 ### Touch 👆
 
@@ -47,8 +48,8 @@ No on-screen buttons, just gestures:
 | Gesture | What it does |
 | --- | --- |
 | Drag one finger | move the crosshair like on a trackpad (swipe fast to whip around) |
-| Pinch | fly towards whatever the crosshair points at |
-| Spread | back away |
+| Pinch (fingers together) | fly towards whatever the crosshair points at |
+| Spread (fingers apart) | back away |
 | Two fingers left / right | slide sideways (works while pinching, too) |
 | Tap | info about what the crosshair points at |
 | Two-finger tap | close the info box / open the menu |
@@ -60,9 +61,10 @@ Pinching covers a share of the distance to the target, so far things come quickl
 | Button | What it does |
 | --- | --- |
 | Left / right stick | move / look |
-| `RB` · `LB` | fly up · fly down |
+| `RB` (or `A`) · `LB` | fly up · fly down |
 | `L3` | sprint |
-| `RT` · `LT` | building info · close |
+| `RT` | info about what the crosshair points at |
+| `LT` (or `B`) | close the info box, POI list or settings |
 | `Y` | noclip |
 | D-pad ▲ ▼ | speed multiplier |
 | D-pad ◀ ▶ | previous / next landmark |
