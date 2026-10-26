@@ -48,6 +48,23 @@ function inPoly(coords, lon, lat) {
   }
   return false;
 }
+/**
+ * Wall hits lie exactly on the footprint edge, where inPoly is a coin toss (and the nearest-record
+ * fallback then reports a neighbour). Push them WALL_INSET m horizontally into the building.
+ */
+const WALL_INSET = 1.5;
+function insidePoint(hit, dir) {
+  const p = hit.point.clone();
+  if (!hit.face) return p;
+  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  if (Math.abs(n.y) > 0.7) return p; // roof or floor: already inside the footprint
+  n.y = 0;
+  n.normalize();
+  // DoubleSide meshes: winding is arbitrary, so orient the normal against the view ray (= out of the building)
+  if (n.dot(dir) > 0) n.negate();
+  return p.addScaledVector(n, -WALL_INSET);
+}
+
 const metres = (lon1, lat1, lon2, lat2) => Math.hypot((lon2 - lon1) * 111320 * Math.cos((lat1 * Math.PI) / 180), (lat2 - lat1) * 111320);
 
 async function buildingHtml(point) {
@@ -234,7 +251,7 @@ export class InfoUI {
       const s = structureAt(hit.point.x, hit.point.z);
       return { kind, label: s?.name || tText('bridge'), s, point: hit.point.clone() };
     }
-    return { kind: 'building', label: tText('building'), point: hit.point.clone() };
+    return { kind: 'building', label: tText('building'), point: insidePoint(hit, this.ray.ray.direction) };
   }
 
   update(dt, active) {
