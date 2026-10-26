@@ -17,7 +17,6 @@ export const DEFAULTS = {
   touchDragView: false,
   touchSpreadToApproach: false,
   showStats: false,
-  transit: true,
 };
 
 const km = (m) =>
@@ -45,7 +44,6 @@ const SCHEMA = [
   { key: 'touchDragView', label: 'set.touchDragView', type: 'check', hint: 'set.touchDragView.hint' },
   { key: 'touchSpreadToApproach', label: 'set.touchSpread', type: 'check', hint: 'set.touchSpread.hint' },
   { section: 'set.display' },
-  { key: 'transit', label: 'set.transit', type: 'check', hint: 'set.transit.hint' },
   { key: 'showStats', label: 'set.showStats', type: 'check' },
 ];
 

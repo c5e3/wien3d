@@ -2,3 +2,6 @@ node_modules
 dist
 .vercel
 .cache
+
+# backup of the Wiener Linien live data feature (see wienerlinien/README.md)
+wienerlinien/

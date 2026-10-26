@@ -8,8 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:structures": "node --max-old-space-size=8000 scripts/build-structures.mjs",
-    "build:transit": "node --max-old-space-size=8000 scripts/build-transit.mjs"
+    "build:structures": "node --max-old-space-size=8000 scripts/build-structures.mjs"
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
