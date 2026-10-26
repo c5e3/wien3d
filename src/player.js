@@ -1,18 +1,12 @@
 import * as THREE from 'three';
 
-// Minecraft (Java) creative-mode feel, 1 block = 1 m.
+// Minecraft (Java) creative-mode flight, 1 block = 1 m. Always flying: at street level the data has no detail.
 const WIDTH_R = 0.3;
 const HEIGHT = 1.8;
 const EYE = 1.62;
-const EYE_SNEAK = 1.27;
 const STEP = 0.6;
-const GRAVITY = 32;
-const JUMP_V = 9;
-const TERMINAL = 78;
 const SPEED_SCALE = 2; // Minecraft speeds feel slow at city scale
-const SPEED = Object.fromEntries(
-  Object.entries({ walk: 4.317, sprint: 5.612, sneak: 1.31, fly: 10.92, flySprint: 21.78, flyVert: 7.5 }).map(([k, v]) => [k, v * SPEED_SCALE])
-);
+const SPEED = Object.fromEntries(Object.entries({ fly: 10.92, flySprint: 21.78, flyVert: 7.5 }).map(([k, v]) => [k, v * SPEED_SCALE]));
 export const SPEED_STEPS = [1, 2, 4, 8, 16, 32, 64];
 const DOUBLE_TAP = 300;
 const EPS = 1e-3;
@@ -30,15 +24,15 @@ export class Player {
     this.vel = new THREE.Vector3();
     this.yaw = 0;
     this.pitch = 0;
-    this.flying = true;
     this.noclip = false;
     this.sprinting = false;
     this.onGround = false;
     this.speedIdx = SPEED_STEPS.indexOf(4); // default ×4
+    this.lookSens = 1; // multiplies mouse, touch and controller look
     this.keys = new Set();
-    this.eye = EYE;
+    this.pad = { fwd: 0, str: 0, up: 0, down: 0 }; // analog controller input, see gamepad.js
+    this.touchVel = new THREE.Vector3(); // flight from pinch gestures, see touch.js
     this.baseFov = camera.fov;
-    this.lastSpace = 0;
     this.lastW = 0;
     this.locked = false;
     // soft: playing without pointer lock (after the user's own Esc the browser wants a click before it locks
@@ -56,15 +50,14 @@ export class Player {
     });
     document.addEventListener('mousemove', (e) => {
       if (!this.active) return;
-      const s = 0.0022;
-      this.yaw -= e.movementX * s;
-      this.pitch = Math.max(-Math.PI / 2 + 0.001, Math.min(Math.PI / 2 - 0.001, this.pitch - e.movementY * s));
+      const s = 0.0022 * this.lookSens;
+      this.look(-e.movementX * s, -e.movementY * s);
     });
     document.addEventListener(
       'wheel',
       (e) => {
         if (!this.active) return;
-        this.speedIdx = Math.max(0, Math.min(SPEED_STEPS.length - 1, this.speedIdx + (e.deltaY < 0 ? 1 : -1)));
+        this.changeSpeed(e.deltaY < 0 ? 1 : -1);
       },
       { passive: true }
     );
@@ -73,22 +66,12 @@ export class Player {
       if (e.code.startsWith('Control') || e.code === 'Space' || e.code === 'Tab') e.preventDefault();
       if (!e.repeat) {
         const now = performance.now();
-        if (e.code === 'Space') {
-          if (now - this.lastSpace < DOUBLE_TAP && !this.noclip) {
-            this.flying = !this.flying;
-            this.vel.y = 0;
-            this.lastSpace = 0;
-          } else this.lastSpace = now;
-        }
         if (e.code === 'KeyW') {
           if (now - this.lastW < DOUBLE_TAP) this.sprinting = true;
           this.lastW = now;
         }
         if (e.code === 'ControlLeft' || e.code === 'KeyR') this.sprinting = true;
-        if (e.code === 'KeyN') {
-          this.noclip = !this.noclip;
-          if (this.noclip) this.flying = true;
-        }
+        if (e.code === 'KeyN') this.toggleNoclip();
       }
       this.keys.add(e.code);
     });
@@ -105,11 +88,25 @@ export class Player {
     document.body.classList.toggle('soft-play', on);
   }
 
+  look(dYaw, dPitch) {
+    this.yaw += dYaw;
+    this.pitch = Math.max(-Math.PI / 2 + 0.001, Math.min(Math.PI / 2 - 0.001, this.pitch + dPitch));
+  }
+
+  toggleNoclip() {
+    this.noclip = !this.noclip;
+  }
+
+  changeSpeed(d) {
+    this.speedIdx = Math.max(0, Math.min(SPEED_STEPS.length - 1, this.speedIdx + d));
+  }
+
   get speedMult() {
     return SPEED_STEPS[this.speedIdx];
   }
 
   lock() {
+    if (!this.dom.requestPointerLock) return; // e.g. phones: soft play only
     const p = this.dom.requestPointerLock({ unadjustedMovement: true });
     // without a click after the user's own Esc the browser refuses; soft play covers that
     if (p && p.catch) p.catch(() => this.dom.requestPointerLock()?.catch?.(() => {}));
@@ -119,7 +116,6 @@ export class Player {
     this.pos.set(x, NaN, z);
     this.pendingHeight = yAboveGround;
     this.vel.set(0, 0, 0);
-    this.flying = true;
   }
 
   update(dt) {
@@ -130,34 +126,26 @@ export class Player {
       this.pos.y = g + this.pendingHeight;
     }
 
-    const fwd = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
-    const str = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
+    const pad = this.pad, tv = this.touchVel;
+    const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+    const fwd = clamp1((k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) + pad.fwd);
+    const str = clamp1((k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) + pad.str);
     if (fwd <= 0) this.sprinting = false;
-    const up = k.has('Space');
-    const down = k.has('ShiftLeft') || k.has('ShiftRight');
-    const sneaking = down && !this.flying;
+    const upAmt = Math.max(k.has('Space') ? 1 : 0, pad.up);
+    const downAmt = Math.max(k.has('ShiftLeft') || k.has('ShiftRight') ? 1 : 0, pad.down);
 
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     let wx = -sin * fwd + cos * str;
     let wz = -cos * fwd - sin * str;
     const wl = Math.hypot(wx, wz);
-    if (wl > 0) (wx /= wl), (wz /= wl);
+    if (wl > 1) (wx /= wl), (wz /= wl); // keys: diagonal; sticks: keep partial deflection
 
     const m = this.speedMult;
-    if (this.flying) {
-      const sp = (this.sprinting ? SPEED.flySprint : SPEED.fly) * m;
-      const a = 1 - Math.exp(-dt * 6);
-      this.vel.x += (wx * sp - this.vel.x) * a;
-      this.vel.z += (wz * sp - this.vel.z) * a;
-      this.vel.y += (((up ? 1 : 0) - (down ? 1 : 0)) * SPEED.flyVert * m - this.vel.y) * a;
-    } else {
-      const sp = (sneaking ? SPEED.sneak : this.sprinting ? SPEED.sprint : SPEED.walk) * m;
-      const a = 1 - Math.exp(-dt * (this.onGround ? 20 : 4));
-      this.vel.x += (wx * sp - this.vel.x) * a;
-      this.vel.z += (wz * sp - this.vel.z) * a;
-      this.vel.y = Math.max(-TERMINAL, this.vel.y - GRAVITY * dt);
-      if (up && this.onGround) this.vel.y = JUMP_V;
-    }
+    const sp = (this.sprinting ? SPEED.flySprint : SPEED.fly) * m;
+    const a = 1 - Math.exp(-dt * 6);
+    this.vel.x += (wx * sp + tv.x - this.vel.x) * a;
+    this.vel.z += (wz * sp + tv.z - this.vel.z) * a;
+    this.vel.y += ((upAmt - downAmt) * SPEED.flyVert * m + tv.y - this.vel.y) * a;
 
     // don't fall through ground that hasn't streamed in yet
     if (this.terrain.heightAt(this.pos.x, this.pos.z) === null) this.vel.set(0, 0, 0);
@@ -167,13 +155,12 @@ export class Player {
     const h = dt / n;
     for (let i = 0; i < n; i++) this.step(h);
 
-    this.eye += ((sneaking ? EYE_SNEAK : EYE) - this.eye) * (1 - Math.exp(-dt * 15));
     this.syncCamera(dt);
   }
 
   syncCamera(dt) {
     const c = this.camera;
-    c.position.set(this.pos.x, (Number.isNaN(this.pos.y) ? 400 : this.pos.y) + this.eye, this.pos.z);
+    c.position.set(this.pos.x, (Number.isNaN(this.pos.y) ? 400 : this.pos.y) + EYE, this.pos.z);
     c.rotation.set(this.pitch, this.yaw, 0);
     const targetFov = this.baseFov * (this.sprinting ? 1.15 : 1);
     if (Math.abs(c.fov - targetFov) > 0.01) {
@@ -218,7 +205,6 @@ export class Player {
         p.y = support;
         v.y = 0;
         this.onGround = true;
-        if (this.flying) this.flying = false; // landing ends flight, like Minecraft
       } else {
         p.y += dy;
         this.onGround = false;
@@ -267,6 +253,5 @@ export class Player {
     }
     p[axis] = old;
     this.vel[axis] = 0;
-    if (axis === 'x' || axis === 'z') this.sprinting = this.sprinting && this.flying;
   }
 }

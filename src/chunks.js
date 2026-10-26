@@ -18,8 +18,9 @@ function pickable(mesh, kind) {
 
 // A chunk is one z16 web-mercator tile (~407 m wide in Vienna).
 export const CZ = 16;
-const R_TERRAIN = 6; // chunks of ground around the player
-const R_BUILDINGS = 3;
+export const RANGE_DEFAULT = 3; // chunks with buildings, trees and bridges around the player (setting)
+const TERRAIN_EXTRA = 3; // ground reaches this many chunks further
+export const CHUNK_M = 407;
 const GROUND_SEG = 48;
 
 // basemap.at orthophoto (free, no key)
@@ -126,6 +127,8 @@ class Chunk {
     this.prisms = [];
     this.groundReq = false;
     this.buildReq = false;
+    this.bgroup = null; // buildings, roofs, bridges, trees: unloaded again when they fall out of range
+    this.babort = null;
     this.rev = 0; // bumped (globally unique) whenever pickable geometry is added
     mgr.scene.add(this.group);
   }
@@ -165,10 +168,11 @@ class Chunk {
         this.textures.delete(z);
         this.applyTexture();
       }
-    if (this.dist <= R_BUILDINGS && !this.buildReq) {
+    if (this.dist <= m.range && !this.buildReq) {
       this.buildReq = true;
-      m.sNet.add(this, () => this.loadBuildings());
-    }
+      this.babort = new AbortController();
+      m.sNet.add(this, () => this.loadBuildings(this.babort.signal));
+    } else if (this.dist > m.range + 1 && this.buildReq) this.unloadBuildings();
   }
 
   async loadGround() {
@@ -243,53 +247,61 @@ class Chunk {
     this.material.needsUpdate = true;
   }
 
-  async loadBuildings() {
+  async loadBuildings(signal) {
     const bbox = tileLonLatBBox(CZ, this.x, this.y);
-    const signal = this.abort.signal;
     const [bk, trees, l2] = await Promise.all([
       fetchWfs('ogdwien:FMZKBKMOGD', 'O_KOTE,U_KOTE,T_KOTE,SHAPE', bbox, signal),
       fetchWfs('ogdwien:BAUMKATOGD', null, bbox, signal).catch(() => []),
       lod2Buildings(bbox, signal).catch(() => []),
       this.mgr.terrain.ensure(this.b),
     ]);
-    if (this.disposed) return;
+    await structuresReady;
+    if (signal.aborted) return;
+    const g = new THREE.Group();
     const lod2 = buildLod2(l2, this.b);
-    if (lod2.geometry) this.group.add((this.lod2 = pickable(new THREE.Mesh(lod2.geometry, this.material), 'building')));
+    if (lod2.geometry) g.add(pickable(new THREE.Mesh(lod2.geometry, this.material), 'building'));
     const { geometry, prisms, count } = buildBuildings(bk, this.b, this.mgr.terrain, lod2.covered);
     this.count = count + lod2.count;
     prisms.push(...lod2.prisms);
-    await structuresReady;
-    if (this.disposed) return;
     const st = buildStructures(this.b, this.mgr.terrain);
-    if (st.top) this.group.add((this.structTop = pickable(new THREE.Mesh(st.top, this.material), 'structure')));
-    if (st.side) this.group.add((this.structSide = pickable(new THREE.Mesh(st.side, sideMaterial), 'structure')));
+    if (st.top) g.add(pickable(new THREE.Mesh(st.top, this.material), 'structure'));
+    if (st.side) g.add(pickable(new THREE.Mesh(st.side, sideMaterial), 'structure'));
     prisms.push(...st.prisms);
-    if (geometry) {
-      this.buildings = pickable(new THREE.Mesh(geometry, this.material), 'building');
-      this.group.add(this.buildings);
-    }
+    if (geometry) g.add(pickable(new THREE.Mesh(geometry, this.material), 'building'));
     this.prisms = prisms;
     this.mgr.collision.add(prisms);
-    this.trees = buildTrees(trees, this.b, this.mgr.terrain);
-    if (this.trees) this.group.add(this.trees);
+    const t = buildTrees(trees, this.b, this.mgr.terrain);
+    if (t) g.add(t);
+    this.bgroup = g;
+    this.group.add(g);
     this.mgr.stats.buildings += this.count;
     this.touch();
+  }
+
+  unloadBuildings() {
+    this.buildReq = false;
+    this.babort?.abort();
+    if (this.bgroup) {
+      this.group.remove(this.bgroup);
+      // trees: instanced meshes over shared geometry, released by their own dispose
+      this.bgroup.traverse((o) => (o.userData.dispose ? o.userData.dispose() : o.isMesh && !o.isInstancedMesh && o.geometry.dispose()));
+      this.bgroup = null;
+      this.touch();
+    }
+    this.mgr.collision.remove(this.prisms);
+    this.prisms = [];
+    this.mgr.stats.buildings -= this.count || 0;
+    this.count = 0;
   }
 
   dispose() {
     this.disposed = true;
     this.abort.abort();
+    this.unloadBuildings();
     this.mgr.scene.remove(this.group);
     this.ground?.geometry.dispose();
-    this.buildings?.geometry.dispose();
-    this.structTop?.geometry.dispose();
-    this.lod2?.geometry.dispose();
-    this.structSide?.geometry.dispose();
-    this.trees?.userData.dispose();
     for (const t of this.textures.values()) t.dispose();
     this.material.dispose();
-    this.mgr.collision.remove(this.prisms);
-    this.mgr.stats.buildings -= this.count || 0;
   }
 }
 
@@ -306,11 +318,19 @@ export class ChunkManager {
     this.stats = { buildings: 0 };
     this.rev = 0;
     this.center = null;
+    this.setRange(RANGE_DEFAULT);
+  }
+
+  /** Building radius in chunks; the ground reaches TERRAIN_EXTRA further. Applied on the next update. */
+  setRange(r) {
+    this.range = r;
+    this.terrainRange = r + TERRAIN_EXTRA;
+    const R = this.terrainRange;
     // offsets sorted by distance so near chunks get created first
     this.offsets = [];
-    for (let dy = -R_TERRAIN; dy <= R_TERRAIN; dy++)
-      for (let dx = -R_TERRAIN; dx <= R_TERRAIN; dx++) this.offsets.push([dx, dy]);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) this.offsets.push([dx, dy]);
     this.offsets.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+    this.center = null;
   }
 
   get pending() {
@@ -343,7 +363,7 @@ export class ChunkManager {
     }
     for (const [k, c] of this.chunks) {
       c.dist = Math.max(Math.abs(c.x - cx), Math.abs(c.y - cy));
-      if (c.dist > R_TERRAIN + 1) {
+      if (c.dist > this.terrainRange + 1) {
         c.dispose();
         this.chunks.delete(k);
       } else c.sync();

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { worldToLonLat, WIENER_NULL } from './geo.js';
 import { structureAt } from './structures.js';
 import { featureLabel } from './poi.js';
+import { t, tText, locale } from './i18n.js';
 
 // Crosshair picking + info popups for buildings, bridges/tunnels, trees and POIs.
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
@@ -70,60 +71,76 @@ async function buildingHtml(point) {
   const g = gi?.properties || {};
   const height = parts.length ? Math.max(...parts.map((f) => f.properties.O_KOTE - f.properties.T_KOTE).filter(Number.isFinite)) : null;
   const ground = parts.length ? Math.min(...parts.map((f) => f.properties.T_KOTE).filter(Number.isFinite)) : null;
-  const addr = g.STRNAML ? `${g.STRNAML} ${g.VONN ?? ''}${g.VONA ?? ''}${g.BISN ? '–' + g.BISN : ''}, ${Number(g.BEZ) || ''}. Bezirk` : null;
+  const addr = g.STRNAML ? `${g.STRNAML} ${g.VONN ?? ''}${g.VONA ?? ''}${g.BISN ? '–' + g.BISN : ''}, ${tText('info.district', { n: Number(g.BEZ) || '' })}` : null;
 
-  let html = `<h2>${esc(g.HA_NAME || 'Gebäude')}</h2>`;
+  let html = `<h2>${esc(g.HA_NAME || tText('building'))}</h2>`;
   html += rows([
-    ['Adresse', addr],
-    ['Baujahr', g.BAUJAHR],
-    ['Bauperiode', per?.OBJ_STR_TXT || g.L_BAUJ],
-    ['Umbau / 2. Periode', per?.OBJ_STR2_TXT],
-    ['Bautyp', per?.BAUTYP_TXT || g.L_BAUTYP],
-    ['Nutzung', g.L_NUTZUNG],
-    ['Architekt', g.ARCHITEKT],
-    ['Geschoße', g.GESCH_ANZ],
-    ['Höhe', Number.isFinite(height) ? `${height.toFixed(1)} m` : null],
-    ['Geländehöhe', Number.isFinite(ground) ? `${(ground + WIENER_NULL).toFixed(1)} m ü. A.` : null],
-    ['Konskriptionsnr.', g.CONSCR_NR],
+    [tText('f.address'), addr],
+    [tText('f.built'), g.BAUJAHR],
+    [tText('f.period'), per?.OBJ_STR_TXT || g.L_BAUJ],
+    [tText('f.period2'), per?.OBJ_STR2_TXT],
+    [tText('f.type'), per?.BAUTYP_TXT || g.L_BAUTYP],
+    [tText('f.use'), g.L_NUTZUNG],
+    [tText('f.architect'), g.ARCHITEKT],
+    [tText('f.storeys'), g.GESCH_ANZ],
+    [tText('f.height'), Number.isFinite(height) ? `${height.toFixed(1)} m` : null],
+    [tText('f.ground'), Number.isFinite(ground) ? `${(ground + WIENER_NULL).toFixed(1)} ${tText('info.asl')}` : null],
+    [tText('f.conscr'), g.CONSCR_NR],
   ]);
   const d = near(dach, 40)[0]?.f.properties;
-  if (d) html += `<h3>Dachbodenkataster (BDA)</h3>` + rows([['Objekt', d.BEZEICHNUNG], ['Dachwerk', d.DACHTYP], ['Info', d.WEBLINK1]]);
+  if (d) html += `<h3>${t('info.attic')}</h3>` + rows([[tText('f.object'), d.BEZEICHNUNG], [tText('f.roof'), d.DACHTYP], [tText('f.info'), d.WEBLINK1]]);
   const w = near(wiki, 35).slice(0, 6);
   if (w.length)
-    html += `<h3>Wien Geschichte Wiki</h3><ul>${w
+    html += `<h3>${t('info.wiki')}</h3><ul>${w
       .map(({ f }) => `<li><a href="${esc(f.properties.WEBLINK1)}" target="_blank" rel="noopener">${esc(f.properties.SEITENNAME)}</a> <span class="muted">${esc(f.properties.ART_DES_BAUWERKS || f.properties.ART_DES_OBJEKTS || f.properties.KATEGORIE_TXT || '')}</span></li>`)
       .join('')}</ul>`;
-  if (!gi && !per && !parts.length) html += '<p class="muted">Keine weiteren Daten für dieses Gebäude.</p>';
+  if (!gi && !per && !parts.length) html += `<p class="muted">${t('info.none')}</p>`;
   return html;
 }
 
 function treeHtml(p) {
   return (
-    `<h2>${esc(p.GATTUNG_ART || 'Baum')}</h2>` +
+    `<h2>${esc(p.GATTUNG_ART || tText('tree'))}</h2>` +
     rows([
-      ['Pflanzjahr', p.PFLANZJAHR_TXT || p.PFLANZJAHR],
-      ['Alter', p.PFLANZJAHR > 1000 ? `${new Date().getFullYear() - p.PFLANZJAHR} Jahre` : null],
-      ['Höhe', p.BAUMHOEHE_TXT],
-      ['Kronendurchmesser', p.KRONENDURCHMESSER_TXT],
-      ['Stammumfang', p.STAMMUMFANG_TXT],
-      ['Standort', p.OBJEKT_STRASSE],
-      ['Bezirk', p.BEZIRK],
-      ['Baumnummer', p.BAUMNUMMER],
-      ['Zuständig', p.GEBIETSGRUPPE],
+      [tText('f.planted'), p.PFLANZJAHR_TXT || p.PFLANZJAHR],
+      [tText('f.age'), p.PFLANZJAHR > 1000 ? tText('info.years', { n: new Date().getFullYear() - p.PFLANZJAHR }) : null],
+      [tText('f.height'), p.BAUMHOEHE_TXT],
+      [tText('f.crown'), p.KRONENDURCHMESSER_TXT],
+      [tText('f.trunk'), p.STAMMUMFANG_TXT],
+      [tText('f.location'), p.OBJEKT_STRASSE],
+      [tText('f.district'), p.BEZIRK],
+      [tText('f.treeNo'), p.BAUMNUMMER],
+      [tText('f.responsible'), p.GEBIETSGRUPPE],
     ])
+  );
+}
+
+function riesenradHtml() {
+  return (
+    `<h2>${t('rr.name')}</h2>` +
+    rows([
+      [tText('rr.opened'), tText('rr.openedVal')],
+      [tText('rr.builder'), 'Walter Basset'],
+      [tText('f.height'), `${(64.75).toLocaleString(locale())} m`],
+      [tText('rr.diameter'), `${(60.96).toLocaleString(locale())} m`],
+      [tText('rr.gondolas'), tText('rr.gondolasVal')],
+      [tText('rr.speed'), tText('rr.speedVal')],
+      [tText('rr.weight'), '430 t'],
+    ]) +
+    `<p class="muted">${t('rr.model')}</p>`
   );
 }
 
 function structureHtml(s, point, terrain) {
   const g = terrain.heightAt(point.x, point.z);
   return (
-    `<h2>${esc(s.name || (s.kind === 't' ? 'Tunnel' : 'Brücke'))}</h2>` +
+    `<h2>${esc(s.name || tText(s.kind === 't' ? 'tunnel' : 'bridge'))}</h2>` +
     rows([
-      ['Art', s.kind === 't' ? 'Tunnel / Unterführung' : 'Brücke'],
-      ['Erhalter', s.op],
-      ['Objektnummer', s.id],
-      ['Länge', s.len ? `${s.len} m` : null],
-      [s.kind === 't' ? 'Höhe über Gelände' : 'Höhe über Grund', g !== null ? `${(point.y - g).toFixed(1)} m` : null],
+      [tText('f.kind'), tText(s.kind === 't' ? 'kind.tunnel' : 'bridge')],
+      [tText('f.operator'), s.op],
+      [tText('f.objectNo'), s.id],
+      [tText('f.length'), s.len ? `${s.len} m` : null],
+      [tText(s.kind === 't' ? 'f.aboveTerrain' : 'f.aboveGround'), g !== null ? `${(point.y - g).toFixed(1)} m` : null],
     ])
   );
 }
@@ -134,6 +151,7 @@ export class InfoUI {
     this.chunks = chunks;
     this.pois = pois;
     this.terrain = terrain;
+    this.extra = []; // pickable models outside the chunks (Riesenrad)
     this.ray = new THREE.Raycaster();
     this.ray.far = PICK_RANGE;
     this.ray.firstHitOnly = true;
@@ -151,12 +169,23 @@ export class InfoUI {
     return !this.panel.classList.contains('hidden');
   }
 
+  targets() {
+    const objs = [...this.extra];
+    for (const c of this.chunks.chunks.values())
+      if (c.dist <= 4) c.group.traverse((o) => o.userData.pick && objs.push(o));
+    return objs;
+  }
+
+  /** Distance to whatever the crosshair hits (ground included), or null within PICK_RANGE. */
+  aimDistance() {
+    this.ray.setFromCamera({ x: 0, y: 0 }, this.camera);
+    return this.ray.intersectObjects(this.targets(), false)[0]?.distance ?? null;
+  }
+
   /** What's under the crosshair: { kind, label, ... } or null. */
   pick() {
     let poi = this.pois.pickCenter(this.camera);
-    const objs = [];
-    for (const c of this.chunks.chunks.values())
-      if (c.dist <= 4) c.group.traverse((o) => o.userData.pick && objs.push(o));
+    const objs = this.targets();
     // a pin counts only if nothing (buildings, terrain, ...) sits between camera and pin
     if (poi) {
       const target = new THREE.Vector3(poi.feat.x, poi.feat.y, poi.feat.z);
@@ -173,15 +202,16 @@ export class InfoUI {
     if (!hit) return null;
     const kind = hit.object.userData.pick;
     if (kind === 'ground') return null;
+    if (kind === 'riesenrad') return { kind, label: tText('rr.name') };
     if (kind === 'tree') {
       const p = hit.object.userData.items[hit.instanceId]?.props || {};
-      return { kind, label: `Baum: ${p.GATTUNG_ART || '?'}`, props: p };
+      return { kind, label: tText('aim.tree', { name: p.GATTUNG_ART || '?' }), props: p };
     }
     if (kind === 'structure') {
       const s = structureAt(hit.point.x, hit.point.z);
-      return { kind, label: s?.name || 'Brücke', s, point: hit.point.clone() };
+      return { kind, label: s?.name || tText('bridge'), s, point: hit.point.clone() };
     }
-    return { kind: 'building', label: 'Gebäude', point: hit.point.clone() };
+    return { kind: 'building', label: tText('building'), point: hit.point.clone() };
   }
 
   update(dt, active) {
@@ -189,28 +219,30 @@ export class InfoUI {
     if (!active) return (this.aim.textContent = '');
     if (this.hoverT < 0.12) return;
     this.hoverT = 0;
-    const t = this.pick();
-    this.aim.textContent = t ? t.label : '';
+    const hit = this.pick();
+    this.aim.textContent = hit ? hit.label : '';
   }
 
   async click() {
-    const t = this.pick();
-    if (!t) return this.close();
+    const hit = this.pick();
+    if (!hit) return this.close();
     const id = ++this.req;
     this.panel.classList.remove('hidden');
-    if (t.kind === 'poi') {
-      this.body.innerHTML = `<div class="kicker">${esc(t.poi.layer.title)}</div><h2>${brHtml(featureLabel(t.poi.feat.props, t.poi.layer))}</h2>` + allProps(t.poi.feat.props);
-    } else if (t.kind === 'tree') {
-      this.body.innerHTML = `<div class="kicker">Baumkataster</div>` + treeHtml(t.props);
-    } else if (t.kind === 'structure') {
-      this.body.innerHTML = `<div class="kicker">Brücken &amp; Tunnel</div>` + (t.s ? structureHtml(t.s, t.point, this.terrain) : '<h2>Brücke</h2>');
+    if (hit.kind === 'poi') {
+      this.body.innerHTML = `<div class="kicker">${esc(hit.poi.layer.title)}</div><h2>${brHtml(featureLabel(hit.poi.feat.props, hit.poi.layer))}</h2>` + allProps(hit.poi.feat.props);
+    } else if (hit.kind === 'riesenrad') {
+      this.body.innerHTML = `<div class="kicker">${t('rr.kicker')}</div>` + riesenradHtml();
+    } else if (hit.kind === 'tree') {
+      this.body.innerHTML = `<div class="kicker">${t('info.trees')}</div>` + treeHtml(hit.props);
+    } else if (hit.kind === 'structure') {
+      this.body.innerHTML = `<div class="kicker">${t('info.structures')}</div>` + (hit.s ? structureHtml(hit.s, hit.point, this.terrain) : `<h2>${t('bridge')}</h2>`);
     } else {
-      this.body.innerHTML = '<div class="kicker">Gebäude</div><p class="muted">Lade Gebäudedaten…</p>';
+      this.body.innerHTML = `<div class="kicker">${t('building')}</div><p class="muted">${t('info.loading')}</p>`;
       try {
-        const html = await buildingHtml(t.point);
-        if (id === this.req) this.body.innerHTML = '<div class="kicker">Gebäude</div>' + html;
+        const html = await buildingHtml(hit.point);
+        if (id === this.req) this.body.innerHTML = `<div class="kicker">${t('building')}</div>` + html;
       } catch (e) {
-        if (id === this.req) this.body.innerHTML = `<div class="kicker">Gebäude</div><p class="muted">Daten nicht verfügbar (${esc(e.message)})</p>`;
+        if (id === this.req) this.body.innerHTML = `<div class="kicker">${t('building')}</div><p class="muted">${t('info.unavailable', { e: esc(e.message) })}</p>`;
       }
     }
   }

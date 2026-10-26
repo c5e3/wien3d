@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { lonLatToWorld, worldToLonLat } from './geo.js';
 import { iconFor, pinCanvas, iconBadge, PIN_HIT, CATEGORIES, OTHER, categoryFor } from './poi-icons.js';
+import { t, locale, categoryName } from './i18n.js';
 
 // Every point layer of the Stadt Wien WFS (index: scripts/build-poi-layers.mjs), shown as floating pins.
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
 const BIG = 5000; // larger layers are loaded around the player only
-const RADIUS = 2000; // m
 const HOVER = 12; // pin tip height above the highest solid surface below it (m), joined to it by a faint line
 const PIN_PX = 64; // point sprite size; the pin itself fills the upper half (tip = anchor)
 const EDGE = 15; // m: also probe neighbouring chunks this close, for roofs and crowns overhanging a tile border
@@ -16,20 +16,23 @@ function pinTexture(color, icon) {
   return t;
 }
 
-const MAX_DIST = 2600; // = fog far: beyond it pins would be fully fogged anyway
+// = fog far: beyond it pins would be fully fogged anyway (render distance setting, see setRange)
+const maxDist = { value: 2600 };
+const radius = () => maxDist.value * 0.77; // m: larger layers are loaded this far around the player
 
 // screen size factor by distance; must match the shader below
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const pinScale = (d) => (d > MAX_DIST ? 0 : 1 - 0.55 * smooth(150, MAX_DIST, d));
+const pinScale = (d) => (d > maxDist.value ? 0 : 1 - 0.55 * smooth(150, maxDist.value, d));
 
 // fixed-pixel pins, depth tested (hidden behind buildings), fogged like the map, shrinking with distance
 function pinMaterial(map) {
   const m = new THREE.PointsMaterial({ size: PIN_PX, sizeAttenuation: false, map, transparent: true, alphaTest: 0.4, fog: true });
   m.onBeforeCompile = (s) => {
-    s.vertexShader = s.vertexShader.replace(
+    s.uniforms.pinMaxDist = maxDist;
+    s.vertexShader = 'uniform float pinMaxDist;\n' + s.vertexShader.replace(
       'gl_PointSize = size;',
       `float pinDist = length(mvPosition.xyz);
-      gl_PointSize = pinDist > ${MAX_DIST.toFixed(1)} ? 0.0 : size * mix(1.0, 0.45, smoothstep(150.0, ${MAX_DIST.toFixed(1)}, pinDist));`
+      gl_PointSize = pinDist > pinMaxDist ? 0.0 : size * mix(1.0, 0.45, smoothstep(150.0, pinMaxDist, pinDist));`
     );
   };
   return m;
@@ -97,11 +100,11 @@ export class PoiManager {
     return !this.panel.classList.contains('hidden');
   }
 
-  async show() {
+  async show(focus = true) {
     await this.ready;
     this.panel.classList.remove('hidden');
     this.renderList();
-    this.search.focus();
+    if (focus) this.search.focus(); // not on touch: it would pop up the keyboard
   }
 
   hide() {
@@ -118,10 +121,10 @@ export class PoiManager {
       const a = this.active.get(l.id);
       const col = a ? '#' + a.color.getHexString() : INACTIVE;
       l.icon ??= iconFor(l);
-      const status = a ? (a.loading ? ' · loading…' : ` · ${a.feats.length} shown`) : '';
+      const status = a ? ' · ' + (a.loading ? t('poi.loading') : t('poi.shown', { n: a.feats.length.toLocaleString(locale()) })) : '';
       return `<li><label><input type="checkbox" data-id="${l.id}" ${a ? 'checked' : ''}>
         ${iconBadge(col, l.icon)}<span class="name">${l.title}</span>
-        <span class="cnt">${l.count.toLocaleString('de-AT')}${l.count > BIG ? ' · nearby' : ''}${status}</span></label></li>`;
+        <span class="cnt">${l.count.toLocaleString(locale())}${l.count > BIG ? ' · ' + t('poi.nearby') : ''}${status}</span></label></li>`;
     };
     this.list.innerHTML =
       [...sections]
@@ -132,11 +135,11 @@ export class PoiManager {
           return `<li class="sec${open ? ' open' : ''}">
             <button type="button" class="sec-head" data-cat="${cat}" aria-expanded="${!!open}">
               <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <span class="sec-name">${cat}</span>${on ? `<span class="sec-on">${on} aktiv</span>` : ''}<span class="cnt">${ls.length}</span>
+              <span class="sec-name">${categoryName(cat)}</span>${on ? `<span class="sec-on">${t('poi.on', { n: on })}</span>` : ''}<span class="cnt">${ls.length}</span>
             </button>
             ${open ? `<ul>${ls.map(item).join('')}</ul>` : ''}</li>`;
         })
-        .join('') || '<li class="empty">Keine passenden Kategorien.</li>';
+        .join('') || `<li class="empty">${t('poi.none')}</li>`;
   }
 
   toggle(id, on) {
@@ -175,7 +178,7 @@ export class PoiManager {
     let url = `${WFS}&typeName=ogdwien:${a.meta.id}`;
     if (a.meta.count > BIG) {
       const [lon, lat] = worldToLonLat(p.x, p.z);
-      const dLat = RADIUS / 111320, dLon = RADIUS / (111320 * Math.cos((lat * Math.PI) / 180));
+      const dLat = radius() / 111320, dLon = radius() / (111320 * Math.cos((lat * Math.PI) / 180));
       url += `&bbox=${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat},EPSG:4326`;
       a.center = { x: p.x, z: p.z };
     }
@@ -264,6 +267,13 @@ export class PoiManager {
     line.set([f.x, g, f.z, f.x, y, f.z], i * 6);
   }
 
+  /** Render distance in metres: pins fade out there, large layers load around the player that far. */
+  setRange(m) {
+    if (maxDist.value === m) return;
+    maxDist.value = m;
+    for (const a of this.active.values()) if (a.center) this.load(a);
+  }
+
   update(dt) {
     this.fixT += dt;
     if (this.fixT < 1) return;
@@ -272,7 +282,7 @@ export class PoiManager {
     for (const a of this.active.values()) {
       if (a.loading || !a.points) continue;
       // reload "nearby" layers when the player moved far enough
-      if (a.center && Math.hypot(p.x - a.center.x, p.z - a.center.z) > RADIUS * 0.4) {
+      if (a.center && Math.hypot(p.x - a.center.x, p.z - a.center.z) > radius() * 0.4) {
         this.load(a);
         continue;
       }
