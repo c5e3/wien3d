@@ -1,3 +1,4 @@
+import '@fontsource-variable/open-sans/wght.css';
 import * as THREE from 'three';
 import { lonLatToWorld, worldToLonLat } from './geo.js';
 import { Terrain } from './terrain.js';
