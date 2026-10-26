@@ -321,7 +321,7 @@ if (params.get('poi')) pois.ready.then(() => params.get('poi').split(',').forEac
 if (params.has('info')) setTimeout(() => info.click(), 20000);
 if (params.has('panel')) setTimeout(() => pois.show(), 5000);
 window.addEventListener('beforeunload', (e) => {
-  // guard against Ctrl+W while sprinting with Ctrl
+  // guard against an accidental Ctrl+W (close tab) while flying with W
   if (player.active) e.preventDefault();
 });
 

@@ -64,14 +64,14 @@ export class Player {
     );
     document.addEventListener('keydown', (e) => {
       if (!this.active) return;
-      if (e.code.startsWith('Control') || e.code === 'Space' || e.code === 'Tab') e.preventDefault();
+      if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
       if (!e.repeat) {
         const now = performance.now();
         if (e.code === 'KeyW') {
           if (now - this.lastW < DOUBLE_TAP) this.sprinting = true;
           this.lastW = now;
         }
-        if (e.code === 'ControlLeft' || e.code === 'KeyR') this.sprinting = true;
+        if (e.code === 'KeyR') this.sprinting = true; // not Ctrl: Ctrl+W closes the tab
         if (e.code === 'KeyN') this.toggleNoclip();
       }
       this.keys.add(e.code);
