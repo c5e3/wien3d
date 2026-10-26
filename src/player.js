@@ -32,6 +32,7 @@ export class Player {
     this.keys = new Set();
     this.pad = { fwd: 0, str: 0, up: 0, down: 0 }; // analog controller input, see gamepad.js
     this.touchVel = new THREE.Vector3(); // flight from pinch gestures, see touch.js
+    this.touchSnap = false; // touch.js: velocity follows touchVel without easing (no drift after a pinch)
     this.baseFov = camera.fov;
     this.lastW = 0;
     this.locked = false;
@@ -142,7 +143,7 @@ export class Player {
 
     const m = this.speedMult;
     const sp = (this.sprinting ? SPEED.flySprint : SPEED.fly) * m;
-    const a = 1 - Math.exp(-dt * 6);
+    const a = this.touchSnap ? 1 : 1 - Math.exp(-dt * 6);
     this.vel.x += (wx * sp + tv.x - this.vel.x) * a;
     this.vel.z += (wz * sp + tv.z - this.vel.z) * a;
     this.vel.y += ((upAmt - downAmt) * SPEED.flyVert * m + tv.y - this.vel.y) * a;

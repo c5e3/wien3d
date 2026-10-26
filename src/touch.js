@@ -2,16 +2,15 @@ import * as THREE from 'three';
 
 // Touchscreen controls, no on-screen buttons:
 //  - one finger steers the crosshair like a trackpad; faster swipes turn disproportionately further
-//    (pointer acceleration), a flick keeps spinning briefly
+//    (pointer acceleration)
 //  - pinching flies towards what the crosshair points at, spreading backs away; each step is a fraction of the
-//    distance to that point, so far targets come quickly and near ones gently, and the flight glides out
+//    distance to that point, so far targets come quickly and near ones gently
+//  - nothing moves on after the fingers stop or leave
 //  - a tap opens the info box for the crosshair, a two-finger tap acts like Esc
 const LOOK = 0.0028; // rad per CSS px at gain 1
 const TAP_MS = 280;
 const TAP_PX = 12;
 const FALLBACK_DIST = 250; // pinching at the sky or beyond the pick range
-const GLIDE = 2.2; // 1/s decay of flight after the fingers leave
-const SPIN_DECAY = 6; // 1/s decay of a look flick
 
 export class TouchControls {
   constructor(dom, { player, camera, aimDistance, onTap, onTwoFingerTap }) {
@@ -25,7 +24,6 @@ export class TouchControls {
     this.pinchDist = 0;
     this.pending = 0; // metres to fly along the view since the last frame
     this.speed = 0; // m/s along the view
-    this.spin = { yaw: 0, pitch: 0, t: 0 }; // rad/s of the last look swipe
     this.lookPrev = null; // { x, y, t } of the steering finger
     this.dragView = false; // setting: drag the scene like a photo instead of steering the crosshair
     this.spreadToApproach = false; // setting: map-app style, spreading flies closer
@@ -48,9 +46,7 @@ export class TouchControls {
     }
     for (const t of e.changedTouches) this.pts.set(t.identifier, { x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY });
     this.maxTouches = Math.max(this.maxTouches, this.pts.size);
-    // a finger down catches any glide or spin
     this.speed = 0;
-    this.spin.yaw = this.spin.pitch = 0;
     this.lookPrev = null;
     if (this.pts.size >= 2) this.beginPinch();
     else this.anchorLook(e.timeStamp);
@@ -97,10 +93,6 @@ export class TouchControls {
     const gain = Math.min(4, 0.4 + v / 900) * this.player.lookSens * (this.dragView ? -1 : 1);
     const yaw = -dx * LOOK * gain, pitch = -dy * LOOK * gain;
     this.player.look(yaw, pitch);
-    const k = 0.5; // smooth the flick velocity over the last few events
-    this.spin.yaw += (yaw / dt - this.spin.yaw) * k;
-    this.spin.pitch += (pitch / dt - this.spin.pitch) * k;
-    this.spin.t = now;
   }
 
   pinch() {
@@ -127,36 +119,19 @@ export class TouchControls {
     else if (this.pts.size === 1) this.anchorLook(e.timeStamp);
     if (this.pts.size) return;
     if (!this.moved && e.timeStamp - this.t0 < TAP_MS) {
-      this.spin.yaw = this.spin.pitch = 0;
       if (this.maxTouches === 1) this.onTap();
       else if (this.maxTouches === 2) this.onTwoFingerTap();
-      return;
     }
-    // only a swipe that was still moving when the finger left keeps spinning
-    if (e.timeStamp - this.spin.t > 60 || this.maxTouches > 1) this.spin.yaw = this.spin.pitch = 0;
   }
 
   update(dt) {
     const p = this.player;
-    if (!p.active) {
-      this.pending = this.speed = this.spin.yaw = this.spin.pitch = 0;
-      p.touchVel.set(0, 0, 0);
-      return;
-    }
-    if (this.pts.size >= 2) {
-      this.speed += (this.pending / Math.max(dt, 1e-3) - this.speed) * (1 - Math.exp(-dt * 20));
-      this.pending = 0;
-    } else {
-      this.speed *= Math.exp(-dt * GLIDE);
-      if (Math.abs(this.speed) < 0.05) this.speed = 0;
-    }
-    if (!this.pts.size && (this.spin.yaw || this.spin.pitch)) {
-      p.look(this.spin.yaw * dt, this.spin.pitch * dt);
-      const f = Math.exp(-dt * SPIN_DECAY);
-      this.spin.yaw *= f;
-      this.spin.pitch *= f;
-      if (Math.hypot(this.spin.yaw, this.spin.pitch) < 0.02) this.spin.yaw = this.spin.pitch = 0;
-    }
+    const pinching = p.active && this.pts.size >= 2;
+    if (pinching) this.speed += (this.pending / Math.max(dt, 1e-3) - this.speed) * (1 - Math.exp(-dt * 20));
+    // flight follows the fingers directly, and stops the moment they let go
+    p.touchSnap = pinching || this.speed !== 0;
+    if (!pinching) this.speed = 0;
+    this.pending = 0;
     this.camera.getWorldDirection(p.touchVel).multiplyScalar(this.speed);
   }
 }

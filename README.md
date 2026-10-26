@@ -52,7 +52,7 @@ No on-screen buttons, just gestures:
 | Tap | info about what the crosshair points at |
 | Two-finger tap | close the info box / open the menu |
 
-Pinching covers a share of the distance to the target, so far things come quickly and close things gently, and you glide out when you let go. Prefer it the other way round? Flip the drag and pinch directions in **Settings**.
+Pinching covers a share of the distance to the target, so far things come quickly and close things gently. You only move while your fingers do. Prefer it the other way round? Flip the drag and pinch directions in **Settings**.
 
 ### Controller 🎮
 
