@@ -13,11 +13,18 @@ export class Gamepads {
     this.invertY = false;
     this.swapUpDown = false; // LB up, RB down
     this.swapSticks = false; // left-handed: look with the left stick, move with the right
+    // FPV drone (mode 2): left stick yaw / height, right stick roll sideways / fly forwards; no shoulder buttons
+    this.drone = false;
+  }
+
+  /** The stick whose click sprints: the one that flies forwards. */
+  get moveStick() {
+    return this.drone !== this.swapSticks ? BTN.RS : BTN.LS;
   }
 
   update(dt) {
     const p = this.player;
-    p.pad.fwd = p.pad.str = p.pad.up = p.pad.down = 0;
+    p.pad.fwd = p.pad.str = p.pad.up = p.pad.down = p.pad.roll = 0;
     // the most recently used one: on Windows the first slot is often a virtual or non-gamepad HID device
     let pad = null;
     for (const g of navigator.getGamepads?.() || []) if (g?.connected && (!pad || g.timestamp > pad.timestamp)) pad = g;
@@ -36,12 +43,22 @@ export class Gamepads {
       return a < DEAD ? 0 : (Math.sign(v) * (a - DEAD)) / (1 - DEAD);
     };
     const btn = (i) => pad.buttons[i]?.value || 0;
+    const s = LOOK * p.lookSens * dt;
+    if (this.drone) {
+      const [t, r] = this.swapSticks ? [2, 0] : [0, 2]; // throttle / yaw stick, roll / pitch stick
+      const yaw = axis(t), lift = -axis(t + 1);
+      p.look(-Math.sign(yaw) * yaw * yaw * s, 0);
+      p.pad.up = Math.max(0, lift);
+      p.pad.down = Math.max(0, -lift);
+      p.pad.str = p.pad.roll = axis(r);
+      p.pad.fwd = -axis(r + 1);
+      return;
+    }
     const [m, l] = this.swapSticks ? [2, 0] : [0, 2];
     p.pad.str = axis(m);
     p.pad.fwd = -axis(m + 1);
     // squared response: fine aiming near the centre, fast turns at full tilt
     const rx = axis(l), ry = axis(l + 1) * (this.invertY ? -1 : 1);
-    const s = LOOK * p.lookSens * dt;
     p.look(-Math.sign(rx) * rx * rx * s, -Math.sign(ry) * ry * ry * s);
     const [up, down] = this.swapUpDown ? [BTN.LB, BTN.RB] : [BTN.RB, BTN.LB];
     p.pad.up = Math.max(btn(BTN.A), btn(up));

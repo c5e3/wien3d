@@ -3,8 +3,9 @@ import * as THREE from 'three';
 // Touchscreen controls, no on-screen buttons:
 //  - one finger steers the crosshair like a trackpad; faster swipes turn disproportionately further
 //    (pointer acceleration)
-//  - pinching flies towards what the crosshair points at, spreading backs away; each step is a fraction of the
-//    distance to that point, so far targets come quickly and near ones gently
+//  - spreading flies towards what the crosshair points at, pinching backs away (like zooming a map; a setting
+//    reverses it); each step is a fraction of the distance to that point, so far targets come quickly and near
+//    ones gently
 //  - two fingers moving left / right together slide sideways, relative to how far away what the crosshair points
 //    at is, and scaled with the speed multiplier (can be combined with pinching)
 //  - two fingers moving up / down together fly forwards / backwards on the level, like W / S (unlike pinching,
@@ -36,7 +37,7 @@ export class TouchControls {
     this.fwdSpeed = 0; // m/s forwards on the level
     this.lookPrev = null; // { x, y, t } of the steering finger
     this.dragView = false; // setting: drag the scene like a photo instead of steering the crosshair
-    this.spreadToApproach = false; // setting: map-app style, spreading flies closer
+    this.pinchToApproach = false; // setting: pinching flies closer instead of spreading
 
     const opts = { passive: false };
     dom.addEventListener('touchstart', (e) => this.start(e), opts);
@@ -114,7 +115,7 @@ export class TouchControls {
     if (!this.pinchDist || !d) return;
     const now = performance.now();
     const dt = Math.max(1 / 240, (now - this.pinchT) / 1000);
-    const s = this.spreadToApproach ? this.pinchDist / d : d / this.pinchDist;
+    const s = this.pinchToApproach ? d / this.pinchDist : this.pinchDist / d; // < 1: closer
     this.pinchDist = d;
     this.pinchT = now;
     // the faster the pinch, the larger the share of the distance it covers

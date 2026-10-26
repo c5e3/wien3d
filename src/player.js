@@ -9,6 +9,7 @@ const SPEED_SCALE = 2; // Minecraft speeds feel slow at city scale
 const SPEED = Object.fromEntries(Object.entries({ fly: 10.92, flySprint: 21.78, flyVert: 7.5 }).map(([k, v]) => [k, v * SPEED_SCALE]));
 export const SPEED_STEPS = [1, 2, 4, 8, 16, 32, 64];
 const DOUBLE_TAP = 300;
+const MAX_ROLL = 0.35; // rad of bank at full sideways stick (drone controls)
 const EPS = 1e-3;
 
 // height of a prism's top at (x, z): flat, or a sloped roof plane clamped to the triangle's height range
@@ -30,7 +31,8 @@ export class Player {
     this.speedIdx = SPEED_STEPS.indexOf(4); // default ×4
     this.lookSens = 1; // multiplies mouse, touch and controller look
     this.keys = new Set();
-    this.pad = { fwd: 0, str: 0, up: 0, down: 0 }; // analog controller input, see gamepad.js
+    this.pad = { fwd: 0, str: 0, up: 0, down: 0, roll: 0 }; // analog controller input, see gamepad.js
+    this.roll = 0; // drone controls bank the view while sliding sideways
     this.touchVel = new THREE.Vector3(); // flight from pinch gestures, see touch.js
     this.touchSnap = false; // touch.js: velocity follows touchVel without easing (no drift after a pinch)
     this.baseFov = camera.fov;
@@ -162,7 +164,8 @@ export class Player {
   syncCamera(dt) {
     const c = this.camera;
     c.position.set(this.pos.x, (Number.isNaN(this.pos.y) ? 400 : this.pos.y) + EYE, this.pos.z);
-    c.rotation.set(this.pitch, this.yaw, 0);
+    this.roll += (-this.pad.roll * MAX_ROLL - this.roll) * (1 - Math.exp(-dt * 6));
+    c.rotation.set(this.pitch, this.yaw, this.roll);
     const targetFov = this.baseFov * (this.sprinting ? 1.15 : 1);
     if (Math.abs(c.fov - targetFov) > 0.01) {
       c.fov += (targetFov - c.fov) * (1 - Math.exp(-dt * 10));

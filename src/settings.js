@@ -14,8 +14,9 @@ export const DEFAULTS = {
   padInvertY: false,
   padSwapUpDown: false,
   padSwapSticks: false,
+  padDrone: false,
   touchDragView: false,
-  touchSpreadToApproach: false,
+  touchPinchToApproach: false,
   showStats: false,
 };
 
@@ -40,9 +41,10 @@ const SCHEMA = [
   { key: 'padInvertY', label: 'set.padInvertY', type: 'check' },
   { key: 'padSwapUpDown', label: 'set.padSwapUpDown', type: 'check' },
   { key: 'padSwapSticks', label: 'set.padSwapSticks', type: 'check' },
+  { key: 'padDrone', label: 'set.padDrone', type: 'check', hint: 'set.padDrone.hint' },
   { section: 'set.touch' },
   { key: 'touchDragView', label: 'set.touchDragView', type: 'check', hint: 'set.touchDragView.hint' },
-  { key: 'touchSpreadToApproach', label: 'set.touchSpread', type: 'check', hint: 'set.touchSpread.hint' },
+  { key: 'touchPinchToApproach', label: 'set.touchPinch', type: 'check', hint: 'set.touchPinch.hint' },
   { section: 'set.display' },
   { key: 'showStats', label: 'set.showStats', type: 'check' },
 ];
