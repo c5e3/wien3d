@@ -29,48 +29,43 @@ const terrain = new Terrain();
 const collision = new Collision();
 const chunks = new ChunkManager({ scene, terrain, collision, renderer });
 const player = new Player(camera, renderer.domElement, terrain, collision);
-const pois = new PoiManager({ scene, terrain, player });
+const pois = new PoiManager({ scene, terrain, player, chunks });
 const info = new InfoUI({ camera, chunks, pois, terrain });
 
-// ---- landmarks (keys 1-9) -------------------------------------------------------------------
+// ---- landmarks (keys 1-9): name, lat, lon, height above ground, yaw, pitch -------------------
 const PLACES = [
-  ['Stephansdom', 48.2079, 16.3716, 25, -2.4],
-  ['Prater / Riesenrad', 48.2160, 16.3940, 40, -2.3],
-  ['Schönbrunn', 48.1830, 16.3122, 50, 0],
-  ['Belvedere', 48.1885, 16.3809, 40, 0],
-  ['Rathaus', 48.2108, 16.3540, 30, -1.57],
-  ['Karlskirche', 48.1972, 16.3718, 25, 0],
-  ['Donau City', 48.2290, 16.4100, 80, -0.6],
-  ['Hofburg / Heldenplatz', 48.2058, 16.3620, 30, -1.0],
-  ['Kahlenberg', 48.2765, 16.3346, 40, 2.5],
+  ['Stephansdom', 48.20813, 16.37129, 117.4, -7.59, -0.42],
+  ['Prater', 48.21596, 16.39418, 161.6, -7.68, -0.66],
+  ['Schönbrunn', 48.18862, 16.31425, 137.5, 2.8, -0.28],
+  ['Belvedere', 48.19894, 16.37979, 250.6, -3.23, -0.56],
+  ['Rathaus', 48.21025, 16.3617, 108.7, -4.91, -0.31],
+  ['Karlskirche / Resselpark', 48.20076, 16.37276, 147.7, -3.78, -0.6],
+  ['Donaucity', 48.22869, 16.40859, 185.0, -0.67, -0.22],
+  ['ZwiDeMu / Heldenplatz', 48.20359, 16.35921, 157.3, -0.85, -0.58],
+  ['Spittelau', 48.23684, 16.3598, 150.8, 2.64, -0.39],
 ];
-function goTo(i) {
-  const [, lat, lon, h, yaw] = PLACES[i];
+function view(lat, lon, h = 40, yaw = 0, pitch = -0.2) {
   const [x, z] = lonLatToWorld(lon, lat);
   player.teleport(x, z, h);
   player.yaw = yaw;
-  player.pitch = -0.15;
+  player.pitch = pitch;
 }
+const goTo = (i) => view(...PLACES[i].slice(1));
 document.addEventListener('keydown', (e) => {
-  if (!player.locked) return;
+  if (!player.active) return;
   const d = /^Digit([1-9])$/.exec(e.code);
   if (d && PLACES[+d[1] - 1]) goTo(+d[1] - 1);
 });
 document.getElementById('places').innerHTML = PLACES.map((p, i) => `<li><b>${i + 1}</b> ${p[0]}</li>`).join('');
 
-// ---- start position: #lat,lon,heightAboveGround,yaw,pitch or Stephansdom ----------------------
+// ---- start position: #lat,lon,heightAboveGround,yaw,pitch or landmark 1 (crosshair on the Stephansdom) ----
 const hash = location.hash.slice(1).split(',').map(Number);
-if (hash.length >= 2 && hash.every(Number.isFinite)) {
-  const [x, z] = lonLatToWorld(hash[1], hash[0]);
-  player.teleport(x, z, hash[2] ?? 40);
-  player.yaw = hash[3] ?? 0;
-  player.pitch = hash[4] ?? -0.2;
-} else goTo(0);
+if (hash.length >= 2 && hash.every(Number.isFinite)) view(...hash);
+else goTo(0);
 
 // ---- UI -----------------------------------------------------------------------------------
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
-overlay.addEventListener('click', () => player.lock());
 const params = new URLSearchParams(location.search);
 const shot = params.has('shot');
 if (shot) overlay.classList.add('hidden');
@@ -83,57 +78,115 @@ function setMouseMode(on) {
   mouseHint.classList.toggle('hidden', !on);
   crosshair.classList.toggle('hidden', on);
 }
+
+// Esc closes the topmost thing (POI list, info box, menu) and returns to the last mode, play or mouse mode;
+// only an Esc with nothing open shows the menu. While the pointer is locked the browser takes Esc itself to
+// unlock, and wants a click before locking again, so play mode carries on as "soft play" until that click.
+let lastMode = 'play', releasing = false, unlockT = 0;
+const menuOpen = () => !overlay.classList.contains('hidden');
+function enterPlay() {
+  lastMode = 'play';
+  setMouseMode(false);
+  overlay.classList.add('hidden');
+  player.setSoft(true); // replaced by the real lock if the browser grants it without a click
+  player.lock();
+}
+function enterMouseMode() {
+  leavePlay();
+  lastMode = 'mouse';
+  overlay.classList.add('hidden');
+  setMouseMode(true);
+}
+function leavePlay() {
+  if (player.locked) {
+    releasing = true;
+    document.exitPointerLock();
+  }
+  player.setSoft(false);
+  player.keys.clear();
+}
+function showMenu() {
+  leavePlay();
+  setMouseMode(false);
+  overlay.classList.toggle('hidden', shot);
+}
+const resume = () => (lastMode === 'mouse' ? enterMouseMode() : enterPlay());
+// Esc in a mode: close the info box if open, else the menu
+const escape = () => (info.open ? info.close() : showMenu());
+
+overlay.addEventListener('click', enterPlay);
 player.onToggle = (locked) => {
-  if (locked) setMouseMode(false);
-  overlay.classList.toggle('hidden', locked || pois.open || mouseMode || shot);
+  if (locked) {
+    lastMode = 'play';
+    setMouseMode(false);
+    overlay.classList.add('hidden');
+    return;
+  }
+  unlockT = performance.now();
+  if (releasing) releasing = false; // P / M / menu: their own UI takes over
+  else if (!shot) {
+    // the user's Esc (or focus loss) while playing
+    if (info.open) {
+      info.close();
+      enterPlay();
+    } else showMenu();
+  }
 };
 
-// P: POI browser (releases the mouse), click: info about what the crosshair points at, X: close info
+// P: POI browser (from play mode), click: info about what the crosshair points at, X: close info
 function closePois() {
   pois.hide();
-  player.lock();
+  enterPlay();
 }
 document.getElementById('poi-close').addEventListener('click', closePois);
 document.addEventListener('keydown', (e) => {
-  if (player.locked) {
-    if (e.code === 'KeyP') {
-      pois.show();
-      document.exitPointerLock();
-    } else if (e.code === 'KeyM') {
-      setMouseMode(true);
-      document.exitPointerLock();
-    } else if (e.code === 'KeyX') info.close();
-  } else if (pois.open && (e.code === 'Escape' || (e.code === 'KeyP' && document.activeElement !== pois.search))) {
+  const esc = e.code === 'Escape';
+  if (esc) {
     e.preventDefault();
-    if (e.code === 'Escape') {
-      pois.hide();
-      overlay.classList.remove('hidden');
-    } else closePois();
-  } else if (mouseMode) {
-    if (e.code === 'KeyM') player.lock();
-    else if (e.code === 'KeyX') info.close();
-    else if (e.code === 'Escape') {
-      setMouseMode(false);
-      overlay.classList.remove('hidden');
+    // a locked Esc is handled on the unlock; ignore the same Esc arriving afterwards
+    if (player.locked || performance.now() - unlockT < 250) return;
+  }
+  if (pois.open) {
+    if (esc || (e.code === 'KeyP' && document.activeElement !== pois.search)) {
+      e.preventDefault();
+      closePois();
     }
+  } else if (menuOpen()) {
+    if (esc) resume();
+  } else if (player.active) {
+    if (esc) escape();
+    else if (e.code === 'KeyP') {
+      e.preventDefault(); // or the "p" lands in the search field that show() focuses
+      leavePlay();
+      pois.show();
+    } else if (e.code === 'KeyM') enterMouseMode();
+    else if (e.code === 'KeyX') info.close();
+    else if (e.code === 'KeyC') hud.classList.toggle('hidden');
+  } else if (mouseMode) {
+    if (esc) escape();
+    else if (e.code === 'KeyM') enterPlay();
+    else if (e.code === 'KeyX') info.close();
+    else if (e.code === 'KeyC') hud.classList.toggle('hidden');
   }
 });
 document.addEventListener('mousedown', (e) => {
-  if (player.locked && e.button === 0) info.click();
-  else if (e.button === 2 && (player.locked || mouseMode)) info.close();
+  if (e.button === 2) {
+    if (player.active || mouseMode) info.close();
+  } else if (e.button === 0) {
+    if (player.active) {
+      if (!player.locked) player.lock(); // soft play: this click lets the browser lock again
+      info.click();
+    } else if (mouseMode && e.target === renderer.domElement) enterPlay(); // not on a panel or link
+  }
 });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
-// in mouse mode a click into the 3D view (not on a panel or link) returns to play mode
-renderer.domElement.addEventListener('mousedown', (e) => {
-  if (mouseMode && e.button === 0) player.lock();
-});
 // screenshot/debug helpers: ?poi=MUSEUMOGD,SEHENSWUERDIGOGD  &info (click after load)
 if (params.get('poi')) pois.ready.then(() => params.get('poi').split(',').forEach((id) => pois.toggle(id, true)));
 if (params.has('info')) setTimeout(() => info.click(), 20000);
 if (params.has('panel')) setTimeout(() => pois.show(), 5000);
 window.addEventListener('beforeunload', (e) => {
   // guard against Ctrl+W while sprinting with Ctrl
-  if (player.locked) e.preventDefault();
+  if (player.active) e.preventDefault();
 });
 
 window.addEventListener('resize', () => {
@@ -170,7 +223,7 @@ function frame(now) {
   player.update(dt);
   chunks.update(player.pos);
   pois.update(dt);
-  info.update(dt, player.locked || shot);
+  info.update(dt, player.active || shot);
   updateHud(now);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

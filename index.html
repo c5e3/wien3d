@@ -4,72 +4,124 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wien 3D</title>
+    <meta name="theme-color" content="#c8023c" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" />
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #b8d3ea; font-family: system-ui, sans-serif; }
+      /* Stadt Wien look, after sagswienmap.vercel.app */
+      :root {
+        --wien-red: #c8023c; --wien-red-dark: #a3002f; --wien-red-light: #fff0f4;
+        --wien-text: #1a1a1a; --wien-text-muted: #555; --wien-border: #d4d4d4; --wien-border-strong: #b0b0b0;
+        --wien-bg: #fff; --wien-bg-alt: #f5f5f5;
+        --wien-shadow: 0 2px 6px #00000014; --wien-shadow-strong: 0 8px 24px #00000024; --wien-shadow-modal: 0 20px 44px #0000004d;
+        --wien-radius: 4px;
+        --font: 'Open Sans', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
+      }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #b8d3ea; color: var(--wien-text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
       canvas { display: block; }
+      .hidden { display: none !important; }
+      body.soft-play, body.soft-play * { cursor: none !important; }
+      h1, h2, h3 { letter-spacing: -.005em; }
+      a { color: var(--wien-red); }
+      a:hover { color: var(--wien-red-dark); }
+
       #crosshair { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; }
       #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
       #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
       #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
-      #hud { position: fixed; left: 10px; top: 10px; color: #fff; font: 13px/1.45 ui-monospace, Consolas, monospace; text-shadow: 1px 1px 0 #000a; pointer-events: none; }
-      #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #0008; color: #fff; cursor: pointer; }
-      #overlay.hidden { display: none; }
-      .panel { background: #1b1f24ee; border-radius: 10px; padding: 24px 30px; max-width: 640px; box-shadow: 0 10px 40px #0007; }
-      .panel h1 { margin: 0 0 4px; font-size: 26px; }
-      .panel .sub { margin: 0 0 18px; color: #aab; font-size: 14px; }
-      .cols { display: flex; gap: 36px; font-size: 14px; }
-      .cols ul { list-style: none; margin: 0; padding: 0; line-height: 1.75; }
-      kbd, .cols b { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px; border-radius: 4px; background: #39404a; text-align: center; font: 12px/20px ui-monospace, Consolas, monospace; }
-      .start { margin-top: 20px; font-size: 18px; font-weight: 600; text-align: center; color: #9fd3ff; }
-      .credits { margin-top: 14px; font-size: 11px; color: #889; }
-      .hidden { display: none !important; }
-      #aim-label { position: fixed; left: 50%; top: calc(50% + 18px); transform: translateX(-50%); color: #fff; font: 13px system-ui, sans-serif; text-shadow: 1px 1px 2px #000; pointer-events: none; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
-      .card { position: fixed; background: #1b1f24ee; color: #e8eaed; border-radius: 10px; box-shadow: 0 10px 40px #0007; font-size: 13px; }
-      .card h2 { margin: 2px 0 10px; font-size: 18px; }
-      .card h3 { margin: 14px 0 6px; font-size: 13px; color: #9fd3ff; text-transform: uppercase; letter-spacing: .04em; }
-      .card a { color: #9fd3ff; }
-      .card .muted { color: #8a919b; }
-      .card .kicker { font-size: 11px; color: #9fd3ff; text-transform: uppercase; letter-spacing: .06em; }
+      #aim-label { position: fixed; left: 50%; top: calc(50% + 20px); transform: translateX(-50%); max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+        background: #ffffff80; border: 1px solid #d4d4d480; border-radius: var(--wien-radius); box-shadow: var(--wien-shadow); padding: 3px 9px; font-size: 13px; font-weight: 600; }
+      #aim-label:empty { display: none; }
+
+      /* status box, like the map's state panel */
+      #hud { position: fixed; left: 12px; top: 12px; pointer-events: none; background: #fffffff0; border: 1px solid var(--wien-border); border-left: 4px solid var(--wien-red); border-radius: var(--wien-radius); box-shadow: var(--wien-shadow);
+        padding: 7px 12px; font-size: 12.5px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+      #hud:empty { display: none; }
+
+      kbd, .cols b { display: inline-block; min-width: 18px; padding: 0 6px; margin-right: 6px; border: 1px solid var(--wien-border-strong); border-bottom-width: 2px; border-radius: var(--wien-radius); background: var(--wien-bg-alt); color: var(--wien-text);
+        text-align: center; font: 600 11.5px/19px var(--font); }
+
+      /* start / pause screen */
+      #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: #00000080; cursor: pointer; }
+      .panel { box-sizing: border-box; max-width: 680px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px 26px; background: var(--wien-bg); border: 1px solid var(--wien-border-strong); border-top: 4px solid var(--wien-red); border-radius: var(--wien-radius); box-shadow: var(--wien-shadow-modal); }
+      .panel h1 { margin: 0; font-size: 26px; font-weight: 700; }
+      .panel h1 span { color: var(--wien-red); }
+      .panel .sub { margin: 2px 0 18px; padding-bottom: 14px; border-bottom: 1px solid var(--wien-border); color: var(--wien-text-muted); font-size: 14px; }
+      .panel h3 { margin: 0 0 6px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+      .cols { display: flex; flex-wrap: wrap; gap: 18px 36px; font-size: 14px; }
+      .cols ul { list-style: none; margin: 0; padding: 0; line-height: 1.85; }
+      .start { display: block; margin: 22px auto 0; padding: 10px 26px; border: 1px solid var(--wien-red); border-radius: var(--wien-radius); background: var(--wien-red); color: #fff; font: 600 16px var(--font); cursor: pointer; transition: background .15s; }
+      .start:hover { background: var(--wien-red-dark); border-color: var(--wien-red-dark); }
+      .credits { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--wien-border); font-size: 11px; line-height: 1.5; color: var(--wien-text-muted); }
+
+      /* info + POI boxes */
+      .card { position: fixed; box-sizing: border-box; background: var(--wien-bg); color: var(--wien-text); border: 1px solid var(--wien-border-strong); border-top: 4px solid var(--wien-red); border-radius: var(--wien-radius); box-shadow: var(--wien-shadow-modal); font-size: 13px; }
+      .card h2 { margin: 2px 44px 12px 0; font-size: 18px; font-weight: 700; line-height: 1.3; }
+      .card h3 { margin: 16px 0 6px; padding-top: 10px; border-top: 1px solid var(--wien-border); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+      .card .muted { color: var(--wien-text-muted); }
+      .card .kicker { display: inline-flex; margin-bottom: 6px; padding: 2px 8px; border-radius: var(--wien-radius); background: var(--wien-red-light); color: var(--wien-red-dark); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
       .card table { border-collapse: collapse; width: 100%; }
-      .card th { text-align: left; font-weight: 500; color: #aab2bd; padding: 3px 10px 3px 0; vertical-align: top; white-space: nowrap; }
-      .card td { padding: 3px 0; overflow-wrap: anywhere; }
-      .card ul { margin: 0; padding-left: 18px; line-height: 1.6; }
-      .close { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #aab; font-size: 20px; cursor: pointer; }
+      .card tr + tr { border-top: 1px solid #ececec; }
+      .card th { text-align: left; font-weight: 600; color: var(--wien-text-muted); padding: 5px 12px 5px 0; vertical-align: top; white-space: nowrap; }
+      .card td { padding: 5px 0; overflow-wrap: anywhere; }
+      .card ul { margin: 0; padding-left: 18px; line-height: 1.7; }
+      .close { position: absolute; right: 12px; top: 12px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0 0 2px; border: 1px solid var(--wien-border); border-radius: 50%; background: var(--wien-bg);
+        color: var(--wien-text); font: 22px/1 var(--font); cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+      .close:hover { background: var(--wien-red); border-color: var(--wien-red); color: #fff; }
       #info-panel { right: 16px; top: 16px; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 16px 18px; }
-      #mouse-mode { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #1b1f24dd; color: #e8eaed; padding: 7px 14px; border-radius: 8px; font-size: 13px; pointer-events: none; }
-      #poi-panel { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); height: min(640px, calc(100vh - 32px)); display: flex; flex-direction: column; padding: 18px 20px; }
-      #poi-panel header { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-      #poi-panel h2 { margin: 0; flex: 1; }
-      #poi-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; border: 1px solid #39404a; background: #111418; color: #e8eaed; font-size: 14px; margin-bottom: 8px; }
-      #poi-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-      #poi-list li label { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
-      #poi-list li label:hover { background: #2a3038; }
-      #poi-list .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-      #poi-list .cnt { margin-left: auto; color: #8a919b; font-size: 12px; white-space: nowrap; }
-      .btn { background: #39404a; color: #e8eaed; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-      .btn:hover { background: #4a525e; }
+      #mouse-mode { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); pointer-events: none; white-space: nowrap; background: var(--wien-bg); border: 1px solid var(--wien-border); border-left: 4px solid var(--wien-red);
+        border-radius: var(--wien-radius); box-shadow: var(--wien-shadow-strong); padding: 7px 14px; font-size: 13px; }
+
+      #poi-panel { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); height: min(660px, calc(100vh - 32px)); display: flex; flex-direction: column; padding: 16px 18px; }
+      #poi-panel header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--wien-border); }
+      #poi-panel h2 { margin: 0; flex: 1; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+      #poi-panel .close { position: static; flex: none; }
+      #poi-search { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1.5px solid #d0d0d0; border-radius: 6px; background: var(--wien-bg); color: var(--wien-text); font: 14px var(--font); }
+      #poi-search:focus { border-color: var(--wien-red); outline: none; }
+      #poi-list { list-style: none; margin: 0 -4px; padding: 0 4px; overflow-y: auto; flex: 1; accent-color: var(--wien-red); }
+      #poi-list li label { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--wien-radius); cursor: pointer; transition: background .12s; }
+      #poi-list li label:hover { background: var(--wien-red-light); }
+      #poi-list li label:has(input:checked) { border-color: var(--wien-border); border-left: 3px solid var(--wien-red); padding-left: 6px; font-weight: 600; }
+      #poi-list input { margin: 0; flex: none; }
+      #poi-list ul { list-style: none; margin: 2px 0 6px; padding: 0 0 0 10px; }
+      #poi-list .sec + .sec { border-top: 1px solid var(--wien-border); }
+      #poi-list .sec-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 8px; border: 0; border-radius: var(--wien-radius); background: none; color: var(--wien-text); cursor: pointer; text-align: left;
+        font: 700 12.5px var(--font); text-transform: uppercase; letter-spacing: .04em; }
+      #poi-list .sec-head:hover { background: var(--wien-bg-alt); }
+      #poi-list .sec-head:focus-visible { outline: 2px solid var(--wien-red); outline-offset: -2px; }
+      #poi-list .chev { width: 16px; height: 16px; flex: none; color: var(--wien-red); transition: transform .15s; }
+      #poi-list .sec.open .chev { transform: rotate(90deg); }
+      #poi-list .sec-on { padding: 1px 7px; border-radius: var(--wien-radius); background: var(--wien-red); color: #fff; font-size: 10.5px; letter-spacing: .02em; }
+      #poi-list .empty { padding: 14px; color: var(--wien-text-muted); }
+      #poi-list .ico { width: 22px; height: 22px; flex: none; }
+      #poi-list .cnt { margin-left: auto; padding-left: 8px; color: var(--wien-text-muted); font-size: 12px; font-weight: 400; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .btn { border: 1px solid var(--wien-border-strong); border-radius: var(--wien-radius); background: var(--wien-bg); color: var(--wien-text); padding: 5px 11px; font: 500 12.5px var(--font); cursor: pointer; transition: background .12s; }
+      .btn:hover { background: var(--wien-bg-alt); }
+
+      @media (max-width: 600px) { .panel { padding: 18px 16px; } .cols { font-size: 13px; } }
     </style>
   </head>
   <body>
     <div id="crosshair"></div>
     <div id="aim-label"></div>
-    <div id="mouse-mode" class="hidden">Maus-Modus · <kbd>M</kbd> oder Klick in die Szene zum Weiterspielen</div>
-    <div id="hud"></div>
+    <div id="mouse-mode" class="hidden">Maus-Modus · <kbd>M</kbd> oder Klick in die Szene zum Weiterspielen · <kbd>Esc</kbd> Menü</div>
+    <div id="hud" class="hidden"></div>
     <div id="info-panel" class="card hidden">
-      <button id="info-close" class="close" title="Close (X)">×</button>
+      <button id="info-close" class="close" title="Schließen (X / Esc)" aria-label="Schließen">×</button>
       <div id="info-body"></div>
     </div>
     <div id="poi-panel" class="card hidden">
-      <header><h2>Orte &amp; POIs (OGD Wien)</h2><button id="poi-clear" class="btn">Alle aus</button><button id="poi-close" class="btn">Schließen (P)</button></header>
+      <header><h2>Orte &amp; POIs (OGD Wien)</h2><button id="poi-clear" class="btn">Alle aus</button><button id="poi-close" class="close" title="Schließen (P / Esc)" aria-label="Schließen">×</button></header>
       <input id="poi-search" type="search" placeholder="Suchen… (z. B. Museum, Trinkbrunnen, Kunstwerke)" autocomplete="off" />
       <ul id="poi-list"></ul>
     </div>
     <div id="overlay">
       <div class="panel">
-        <h1>Wien 3D</h1>
+        <h1>Wien <span>3D</span></h1>
         <p class="sub">Open Government Data Vienna &amp; Austria</p>
         <div class="cols">
-          <ul>
+          <div><h3>Steuerung</h3><ul>
             <li><kbd>W A S D</kbd> move</li>
             <li><kbd>Mouse</kbd> look</li>
             <li><kbd>Space</kbd> jump / fly up</li>
@@ -80,11 +132,12 @@
             <li><kbd>N</kbd> noclip (spectator)</li>
             <li><kbd>P</kbd> POI list · <kbd>Click</kbd> info · <kbd>X</kbd>/<kbd>Right-click</kbd> close info</li>
             <li><kbd>M</kbd> mouse mode (free cursor)</li>
-            <li><kbd>Esc</kbd> pause</li>
-          </ul>
-          <ul id="places"></ul>
+            <li><kbd>C</kbd> toggle coordinates &amp; stats</li>
+            <li><kbd>Esc</kbd> close box / pause</li>
+          </ul></div>
+          <div><h3>Orte</h3><ul id="places"></ul></div>
         </div>
-        <div class="start">Click to play</div>
+        <button class="start" type="button">Click to play</button>
         <div class="credits">
           Buildings &amp; trees: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthophoto: basemap.at (CC BY 4.0) ·
           Bridges &amp; tunnels: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Terrain: DGM Österreich 10 m via AWS Terrain Tiles

@@ -126,7 +126,22 @@ class Chunk {
     this.prisms = [];
     this.groundReq = false;
     this.buildReq = false;
+    this.rev = 0; // bumped (globally unique) whenever pickable geometry is added
     mgr.scene.add(this.group);
+  }
+
+  touch() {
+    this.rev = ++this.mgr.rev;
+  }
+
+  /** Pickable meshes (ground, buildings, structures, trees), cached per revision. */
+  pickables() {
+    if (this.pickRev !== this.rev) {
+      this.pickRev = this.rev;
+      this.pick = [];
+      this.group.traverse((o) => o.userData.pick && this.pick.push(o));
+    }
+    return this.pick;
   }
 
   sync() {
@@ -187,6 +202,7 @@ class Chunk {
     this.ground = new THREE.Mesh(g, this.material);
     this.ground.userData.pick = 'ground';
     this.group.add(this.ground);
+    this.touch();
   }
 
   async loadTexture(z) {
@@ -257,6 +273,7 @@ class Chunk {
     this.trees = buildTrees(trees, this.b, this.mgr.terrain);
     if (this.trees) this.group.add(this.trees);
     this.mgr.stats.buildings += this.count;
+    this.touch();
   }
 
   dispose() {
@@ -287,6 +304,7 @@ export class ChunkManager {
     this.sTex = new Scheduler(6);
     this.sNet = new Scheduler(3);
     this.stats = { buildings: 0 };
+    this.rev = 0;
     this.center = null;
     // offsets sorted by distance so near chunks get created first
     this.offsets = [];
@@ -297,6 +315,18 @@ export class ChunkManager {
 
   get pending() {
     return this.sGround.pending + this.sTex.pending + this.sNet.pending;
+  }
+
+  /** Loaded chunks whose tile overlaps the square (x, z) ± pad. */
+  around(x, z, pad) {
+    const [x0, y0] = worldToTile(CZ, x - pad, z - pad), [x1, y1] = worldToTile(CZ, x + pad, z + pad);
+    const out = [];
+    for (let ty = Math.floor(Math.min(y0, y1)); ty <= Math.floor(Math.max(y0, y1)); ty++)
+      for (let tx = Math.floor(Math.min(x0, x1)); tx <= Math.floor(Math.max(x0, x1)); tx++) {
+        const c = this.chunks.get(`${tx},${ty}`);
+        if (c?.rev) out.push(c);
+      }
+    return out;
   }
 
   update(pos) {

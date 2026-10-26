@@ -1,33 +1,17 @@
 import * as THREE from 'three';
 import { lonLatToWorld, worldToLonLat } from './geo.js';
+import { iconFor, pinCanvas, iconBadge, PIN_HIT, CATEGORIES, OTHER, categoryFor } from './poi-icons.js';
 
 // Every point layer of the Stadt Wien WFS (index: scripts/build-poi-layers.mjs), shown as floating pins.
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
 const BIG = 5000; // larger layers are loaded around the player only
 const RADIUS = 2000; // m
-const HOVER = 30; // pin tip height above ground (m), joined to the ground by a faint line
-const PIN_PX = 46; // point sprite size; the pin itself fills the upper half (tip = anchor)
+const HOVER = 12; // pin tip height above the highest solid surface below it (m), joined to it by a faint line
+const PIN_PX = 64; // point sprite size; the pin itself fills the upper half (tip = anchor)
+const EDGE = 15; // m: also probe neighbouring chunks this close, for roofs and crowns overhanging a tile border
 
-function pinTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  // pin occupies the upper half so its tip sits exactly on the point position
-  g.beginPath();
-  g.moveTo(32, 32);
-  g.bezierCurveTo(26, 22, 18, 18, 18, 12);
-  g.arc(32, 12, 14, Math.PI, 0);
-  g.bezierCurveTo(46, 18, 38, 22, 32, 32);
-  g.fillStyle = '#fff';
-  g.fill();
-  g.lineWidth = 2.5;
-  g.strokeStyle = 'rgba(0,0,0,0.55)';
-  g.stroke();
-  g.beginPath();
-  g.arc(32, 12, 5, 0, Math.PI * 2);
-  g.fillStyle = 'rgba(0,0,0,0.35)';
-  g.fill();
-  const t = new THREE.CanvasTexture(c);
+function pinTexture(color, icon) {
+  const t = new THREE.CanvasTexture(pinCanvas('#' + color.getHexString(), icon));
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -39,8 +23,8 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 const pinScale = (d) => (d > MAX_DIST ? 0 : 1 - 0.55 * smooth(150, MAX_DIST, d));
 
 // fixed-pixel pins, depth tested (hidden behind buildings), fogged like the map, shrinking with distance
-function pinMaterial(map, color) {
-  const m = new THREE.PointsMaterial({ size: PIN_PX, sizeAttenuation: false, map, color, alphaTest: 0.5, fog: true });
+function pinMaterial(map) {
+  const m = new THREE.PointsMaterial({ size: PIN_PX, sizeAttenuation: false, map, transparent: true, alphaTest: 0.4, fog: true });
   m.onBeforeCompile = (s) => {
     s.vertexShader = s.vertexShader.replace(
       'gl_PointSize = size;',
@@ -51,11 +35,11 @@ function pinMaterial(map, color) {
   return m;
 }
 
-const colorFor = (id) => {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return new THREE.Color().setHSL((h % 360) / 360, 0.75, 0.55);
-};
+// distinct colours (all readable under a white glyph), handed to layers in the order they are switched on
+const PALETTE = ['#c8023c', '#1971c2', '#2f9e44', '#e8590c', '#7048e8', '#0c8599', '#9c36b5', '#8d5524', '#5c940d', '#495057'];
+const INACTIVE = '#8a8a8a';
+const SECTION_ORDER = [...CATEGORIES.map(([name]) => name), OTHER];
+const OPEN_KEY = 'wien3d.poiSections'; // expanded list sections, per browser
 
 export function featureLabel(props, layer) {
   if (layer?.label && props[layer.label]) return String(props[layer.label]);
@@ -65,13 +49,15 @@ export function featureLabel(props, layer) {
 }
 
 export class PoiManager {
-  constructor({ scene, terrain, player }) {
+  constructor({ scene, terrain, player, chunks }) {
     this.scene = scene;
     this.terrain = terrain;
     this.player = player;
+    this.chunks = chunks;
     this.layers = [];
     this.active = new Map();
-    this.tex = pinTexture();
+    this.ray = new THREE.Raycaster(undefined, new THREE.Vector3(0, -1, 0), 0, 8000);
+    this.ray.firstHitOnly = true;
     this.fixT = 0;
     this.ready = fetch('/data/poi-layers.json')
       .then((r) => r.json())
@@ -82,6 +68,21 @@ export class PoiManager {
     this.list = document.getElementById('poi-list');
     this.search = document.getElementById('poi-search');
     this.search.addEventListener('input', () => this.renderList());
+    try {
+      this.expanded = new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []);
+    } catch {
+      this.expanded = new Set();
+    }
+    this.list.addEventListener('click', (e) => {
+      const head = e.target.closest('.sec-head');
+      if (!head || this.search.value.trim()) return; // while searching every matching section is open
+      const cat = head.dataset.cat;
+      if (!this.expanded.delete(cat)) this.expanded.add(cat);
+      try {
+        localStorage.setItem(OPEN_KEY, JSON.stringify([...this.expanded]));
+      } catch {}
+      this.renderList();
+    });
     document.getElementById('poi-clear').addEventListener('click', () => {
       for (const id of [...this.active.keys()]) this.toggle(id, false);
       this.renderList();
@@ -111,16 +112,31 @@ export class PoiManager {
   renderList() {
     const q = this.search.value.trim().toLowerCase();
     const rows = this.layers.filter((l) => !q || l.title.toLowerCase().includes(q) || l.id.toLowerCase().includes(q));
-    this.list.innerHTML = rows
-      .map((l) => {
-        const a = this.active.get(l.id);
-        const col = '#' + colorFor(l.id).getHexString();
-        const status = a ? (a.loading ? ' · loading…' : ` · ${a.feats.length} shown`) : '';
-        return `<li><label><input type="checkbox" data-id="${l.id}" ${a ? 'checked' : ''}>
-          <span class="dot" style="background:${col}"></span>${l.title}
-          <span class="cnt">${l.count.toLocaleString('de-AT')}${l.count > BIG ? ' · nearby' : ''}${status}</span></label></li>`;
-      })
-      .join('');
+    const sections = new Map(SECTION_ORDER.map((name) => [name, []]));
+    for (const l of rows) sections.get((l.cat ??= categoryFor(l))).push(l);
+    const item = (l) => {
+      const a = this.active.get(l.id);
+      const col = a ? '#' + a.color.getHexString() : INACTIVE;
+      l.icon ??= iconFor(l);
+      const status = a ? (a.loading ? ' · loading…' : ` · ${a.feats.length} shown`) : '';
+      return `<li><label><input type="checkbox" data-id="${l.id}" ${a ? 'checked' : ''}>
+        ${iconBadge(col, l.icon)}<span class="name">${l.title}</span>
+        <span class="cnt">${l.count.toLocaleString('de-AT')}${l.count > BIG ? ' · nearby' : ''}${status}</span></label></li>`;
+    };
+    this.list.innerHTML =
+      [...sections]
+        .filter(([, ls]) => ls.length)
+        .map(([cat, ls]) => {
+          const open = q || this.expanded.has(cat);
+          const on = ls.filter((l) => this.active.has(l.id)).length;
+          return `<li class="sec${open ? ' open' : ''}">
+            <button type="button" class="sec-head" data-cat="${cat}" aria-expanded="${!!open}">
+              <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="sec-name">${cat}</span>${on ? `<span class="sec-on">${on} aktiv</span>` : ''}<span class="cnt">${ls.length}</span>
+            </button>
+            ${open ? `<ul>${ls.map(item).join('')}</ul>` : ''}</li>`;
+        })
+        .join('') || '<li class="empty">Keine passenden Kategorien.</li>';
   }
 
   toggle(id, on) {
@@ -131,6 +147,7 @@ export class PoiManager {
         if (existing.points) {
           this.scene.remove(existing.points, existing.lines);
           existing.points.geometry.dispose();
+          existing.points.material.map.dispose();
           existing.points.material.dispose();
           existing.lines.geometry.dispose();
           existing.lines.material.dispose();
@@ -142,7 +159,9 @@ export class PoiManager {
     if (existing) return;
     const meta = this.layers.find((l) => l.id === id);
     if (!meta) return;
-    const a = { meta, color: colorFor(id), feats: [], points: null, loading: false, center: null };
+    const used = new Set([...this.active.values()].map((x) => x.color.getHex()));
+    const hex = PALETTE.find((c) => !used.has(new THREE.Color(c).getHex())) ?? PALETTE[this.active.size % PALETTE.length];
+    const a = { meta, color: new THREE.Color(hex), feats: [], points: null, loading: false, center: null };
     this.active.set(id, a);
     this.load(a);
   }
@@ -170,7 +189,7 @@ export class PoiManager {
         const coords = g.type === 'Point' ? [g.coordinates] : g.type === 'MultiPoint' ? g.coordinates : [];
         for (const c of coords) {
           const [x, z] = lonLatToWorld(c[0], c[1]);
-          a.feats.push({ x, z, y: null, props: f.properties });
+          a.feats.push({ x, z, y: null, g: null, key: null, props: f.properties });
         }
       }
       this.rebuild(a);
@@ -191,19 +210,52 @@ export class PoiManager {
     const n = a.feats.length;
     const pos = new Float32Array(n * 3), line = new Float32Array(n * 6);
     a.feats.forEach((f, i) => {
-      const g = this.terrain.heightAt(f.x, f.z);
-      f.g = g;
-      f.y = g === null ? null : g + HOVER;
+      this.settle(f);
       this.place(pos, line, i, f);
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const lgeo = new THREE.BufferGeometry();
     lgeo.setAttribute('position', new THREE.BufferAttribute(line, 3));
-    a.points = new THREE.Points(geo, a.points?.material || pinMaterial(this.tex, a.color));
+    a.points = new THREE.Points(geo, a.points?.material || pinMaterial(pinTexture(a.color, iconFor(a.meta))));
     a.lines = new THREE.LineSegments(lgeo, a.lines?.material || new THREE.LineBasicMaterial({ color: a.color, transparent: true, opacity: 0.45, fog: true }));
     a.points.frustumCulled = a.lines.frustumCulled = false;
     this.scene.add(a.points, a.lines);
+  }
+
+  /**
+   * Highest solid surface (terrain, roof, bridge deck, tree crown, ...) straight below (x, z), with a key of
+   * the chunk revisions it was measured on, or null while not even the terrain is known.
+   */
+  surfaceAt(x, z) {
+    const near = this.chunks.around(x, z, EDGE);
+    const key = near.map((c) => c.rev).join(',');
+    let y = -Infinity;
+    if (near.length) {
+      const meshes = [], trees = new Set();
+      for (const o of near.flatMap((c) => c.pickables())) (o.userData.pick === 'tree' ? trees.add(o.userData.items) : meshes.push(o));
+      this.ray.ray.origin.set(x, 5000, z);
+      const hit = this.ray.intersectObjects(meshes, false)[0];
+      if (hit) y = hit.point.y;
+      // trees analytically (raycasting instanced meshes tests every instance): crown top g + h, radius d / 2
+      for (const items of trees)
+        for (const t of items) if ((t.x - x) ** 2 + (t.z - z) ** 2 < (t.d / 2) ** 2) y = Math.max(y, t.g + t.h);
+    }
+    if (y > -Infinity) return { y, key };
+    const g = this.terrain.heightAt(x, z);
+    return g === null ? null : { y: g, key };
+  }
+
+  /** (Re)place a pin on what's below it; true if it moved. */
+  settle(f) {
+    if (f.y !== null && this.chunks.around(f.x, f.z, EDGE).map((c) => c.rev).join(',') === f.key) return false;
+    const s = this.surfaceAt(f.x, f.z);
+    if (!s) return false;
+    f.key = s.key;
+    if (f.g === s.y) return false;
+    f.g = s.y;
+    f.y = s.y + HOVER;
+    return true;
   }
 
   place(pos, line, i, f) {
@@ -224,15 +276,11 @@ export class PoiManager {
         this.load(a);
         continue;
       }
-      // place pins whose terrain height wasn't known yet
+      // re-place pins whose ground wasn't known yet or whose chunks gained buildings, bridges or trees
       const attr = a.points.geometry.attributes.position, lattr = a.lines.geometry.attributes.position;
       let changed = false;
       a.feats.forEach((f, i) => {
-        if (f.y !== null) return;
-        const g = this.terrain.heightAt(f.x, f.z);
-        if (g === null) return;
-        f.g = g;
-        f.y = g + HOVER;
+        if (!this.settle(f)) return;
         this.place(attr.array, lattr.array, i, f);
         changed = true;
       });
@@ -257,9 +305,9 @@ export class PoiManager {
         if (!s) continue;
         v.copy(w).project(camera);
         if (v.z > 1 || v.z < -1) continue;
-        // screen centre relative to the anchor (tip), y up; the pin fills |x| <= 0.23s, 0 <= y <= 0.5s
+        // screen centre relative to the anchor (tip), y up
         const cx = -v.x * hw, cy = -v.y * hh;
-        if (Math.abs(cx) <= 0.23 * s && cy >= 0 && cy <= 0.5 * s && (!best || dist < best.dist)) best = { layer: a.meta, feat: f, dist };
+        if (Math.abs(cx) <= PIN_HIT.w * s && cy >= 0 && cy <= PIN_HIT.h * s && (!best || dist < best.dist)) best = { layer: a.meta, feat: f, dist };
       }
     return best;
   }

@@ -34,24 +34,28 @@ export class Player {
     this.noclip = false;
     this.sprinting = false;
     this.onGround = false;
-    this.speedIdx = 0;
+    this.speedIdx = SPEED_STEPS.indexOf(4); // default ×4
     this.keys = new Set();
     this.eye = EYE;
     this.baseFov = camera.fov;
     this.lastSpace = 0;
     this.lastW = 0;
     this.locked = false;
+    // soft: playing without pointer lock (after the user's own Esc the browser wants a click before it locks
+    // again); the cursor is hidden and mouse look uses plain mouse movement until that click
+    this.soft = false;
     this.onToggle = () => {};
 
     camera.rotation.order = 'YXZ';
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === dom;
-      if (!this.locked) this.keys.clear();
+      if (this.locked) this.setSoft(false);
+      else this.keys.clear();
       this.onToggle(this.locked);
     });
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.active) return;
       const s = 0.0022;
       this.yaw -= e.movementX * s;
       this.pitch = Math.max(-Math.PI / 2 + 0.001, Math.min(Math.PI / 2 - 0.001, this.pitch - e.movementY * s));
@@ -59,13 +63,13 @@ export class Player {
     document.addEventListener(
       'wheel',
       (e) => {
-        if (!this.locked) return;
+        if (!this.active) return;
         this.speedIdx = Math.max(0, Math.min(SPEED_STEPS.length - 1, this.speedIdx + (e.deltaY < 0 ? 1 : -1)));
       },
       { passive: true }
     );
     document.addEventListener('keydown', (e) => {
-      if (!this.locked) return;
+      if (!this.active) return;
       if (e.code.startsWith('Control') || e.code === 'Space' || e.code === 'Tab') e.preventDefault();
       if (!e.repeat) {
         const now = performance.now();
@@ -91,13 +95,24 @@ export class Player {
     document.addEventListener('keyup', (e) => this.keys.delete(e.code));
   }
 
+  /** Taking game input: pointer locked or soft play. */
+  get active() {
+    return this.locked || this.soft;
+  }
+
+  setSoft(on) {
+    this.soft = on;
+    document.body.classList.toggle('soft-play', on);
+  }
+
   get speedMult() {
     return SPEED_STEPS[this.speedIdx];
   }
 
   lock() {
     const p = this.dom.requestPointerLock({ unadjustedMovement: true });
-    if (p && p.catch) p.catch(() => this.dom.requestPointerLock());
+    // without a click after the user's own Esc the browser refuses; soft play covers that
+    if (p && p.catch) p.catch(() => this.dom.requestPointerLock()?.catch?.(() => {}));
   }
 
   teleport(x, z, yAboveGround = 60) {

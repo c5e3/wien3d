@@ -7,9 +7,12 @@ import { featureLabel } from './poi.js';
 const WFS = 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json';
 const PICK_RANGE = 600;
 
+const BR = /<br\s*\/?>/gi;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const isUrl = (v) => typeof v === 'string' && /^https?:\/\//.test(v);
-const fmt = (v) => (isUrl(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40))}…</a>` : esc(String(v).replace(/<br>/g, ' · ')));
+const fmt = (v) => (isUrl(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40))}…</a>` : esc(String(v).replace(BR, ' · ')));
+// OGD texts mark line breaks with <br> (any spelling); a real break in titles, ' · ' elsewhere
+const brHtml = (s) => esc(s).replace(/&lt;br\s*\/?&gt;/gi, '<br>');
 const pretty = (k) => k.replace(/_TXT$/, '').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 const SKIP_KEY = /^(OBJECTID|SE_|SHAPE|FID)|_ID$|^ID$|ROWID|ICON|THUMBNAIL|GEOLAT|GEOLONG|^X$|^Y$|RECHTSWERT|HOCHWERT/;
 
@@ -144,6 +147,10 @@ export class InfoUI {
     document.getElementById('info-close').addEventListener('click', () => this.close());
   }
 
+  get open() {
+    return !this.panel.classList.contains('hidden');
+  }
+
   /** What's under the crosshair: { kind, label, ... } or null. */
   pick() {
     let poi = this.pois.pickCenter(this.camera);
@@ -161,7 +168,7 @@ export class InfoUI {
     this.ray.setFromCamera({ x: 0, y: 0 }, this.camera);
     const hit = this.ray.intersectObjects(objs, false)[0];
     if (poi && (!hit || poi.dist <= hit.distance)) {
-      return { kind: 'poi', label: `${poi.layer.title}: ${featureLabel(poi.feat.props, poi.layer)}`, poi };
+      return { kind: 'poi', label: `${poi.layer.title}: ${featureLabel(poi.feat.props, poi.layer).replace(BR, ' · ')}`, poi };
     }
     if (!hit) return null;
     const kind = hit.object.userData.pick;
@@ -192,7 +199,7 @@ export class InfoUI {
     const id = ++this.req;
     this.panel.classList.remove('hidden');
     if (t.kind === 'poi') {
-      this.body.innerHTML = `<div class="kicker">${esc(t.poi.layer.title)}</div><h2>${esc(featureLabel(t.poi.feat.props, t.poi.layer))}</h2>` + allProps(t.poi.feat.props);
+      this.body.innerHTML = `<div class="kicker">${esc(t.poi.layer.title)}</div><h2>${brHtml(featureLabel(t.poi.feat.props, t.poi.layer))}</h2>` + allProps(t.poi.feat.props);
     } else if (t.kind === 'tree') {
       this.body.innerHTML = `<div class="kicker">Baumkataster</div>` + treeHtml(t.props);
     } else if (t.kind === 'structure') {
