@@ -17,6 +17,9 @@ export const SPEED_STEPS = [1, 2, 4, 8, 16, 32, 64];
 const DOUBLE_TAP = 300;
 const EPS = 1e-3;
 
+// height of a prism's top at (x, z): flat, or a sloped roof plane clamped to the triangle's height range
+const topAt = (q, x, z) => (q.plane ? Math.min(q.top, Math.max(q.minTop, q.plane[0] * x + q.plane[1] * z + q.plane[2])) : q.top);
+
 export class Player {
   constructor(camera, dom, terrain, collision) {
     this.camera = camera;
@@ -177,7 +180,7 @@ export class Player {
   }
 
   blockers(x, y, z) {
-    return this.collision.query(x, z, WIDTH_R).filter((p) => !p.void && p.bottom < y + HEIGHT - EPS && p.top > y + EPS);
+    return this.collision.query(x, z, WIDTH_R).filter((p) => !p.void && p.bottom < y + HEIGHT - EPS && topAt(p, x, z) > y + EPS);
   }
 
   step(h) {
@@ -192,7 +195,10 @@ export class Player {
     const dy = v.y * h;
     if (dy < 0) {
       let support = this.terrainUnder(p.x, p.z);
-      for (const q of this.collision.query(p.x, p.z, WIDTH_R)) if (!q.void && q.top <= p.y + EPS && q.top > support) support = q.top;
+      for (const q of this.collision.query(p.x, p.z, WIDTH_R)) if (!q.void) {
+        const t = topAt(q, p.x, p.z);
+        if (t <= p.y + EPS && t > support) support = t;
+      }
       if (p.y + dy <= support) {
         p.y = support;
         v.y = 0;
@@ -238,7 +244,7 @@ export class Player {
 
     // auto step-up (0.6 m, like stairs/slabs)
     if (this.onGround) {
-      const maxTop = Math.max(...hit.map((q) => q.top));
+      const maxTop = Math.max(...hit.map((q) => topAt(q, p.x, p.z)));
       if (maxTop - p.y <= STEP && !this.blockers(p.x, maxTop, p.z).length) {
         p.y = maxTop;
         return;

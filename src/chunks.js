@@ -3,6 +3,7 @@ import { tileBounds, tileLonLatBBox, worldToTile } from './geo.js';
 import { fetchWfs, buildBuildings, buildTrees } from './buildings.js';
 import { structuresReady, buildStructures, tunnelPolygons, sideMaterial } from './structures.js';
 import polygonClipping from 'polygon-clipping';
+import { lod2Buildings, buildLod2 } from './lod2.js';
 
 // A chunk is one z16 web-mercator tile (~407 m wide in Vienna).
 export const CZ = 16;
@@ -217,13 +218,18 @@ class Chunk {
   async loadBuildings() {
     const bbox = tileLonLatBBox(CZ, this.x, this.y);
     const signal = this.abort.signal;
-    const [bk, trees] = await Promise.all([
+    const [bk, trees, l2] = await Promise.all([
       fetchWfs('ogdwien:FMZKBKMOGD', 'O_KOTE,U_KOTE,T_KOTE,SHAPE', bbox, signal),
       fetchWfs('ogdwien:BAUMKATOGD', 'BAUMHOEHE,KRONENDURCHMESSER,SHAPE', bbox, signal).catch(() => []),
+      lod2Buildings(bbox, signal).catch(() => []),
       this.mgr.terrain.ensure(this.b),
     ]);
     if (this.disposed) return;
-    const { geometry, prisms } = buildBuildings(bk, this.b, this.mgr.terrain);
+    const lod2 = buildLod2(l2, this.b);
+    if (lod2.geometry) this.group.add((this.lod2 = new THREE.Mesh(lod2.geometry, this.material)));
+    const { geometry, prisms, count } = buildBuildings(bk, this.b, this.mgr.terrain, lod2.covered);
+    this.count = count + lod2.count;
+    prisms.push(...lod2.prisms);
     await structuresReady;
     if (this.disposed) return;
     const st = buildStructures(this.b, this.mgr.terrain);
@@ -238,7 +244,7 @@ class Chunk {
     this.mgr.collision.add(prisms);
     this.trees = buildTrees(trees, this.b, this.mgr.terrain);
     if (this.trees) this.group.add(this.trees);
-    this.mgr.stats.buildings += prisms.length;
+    this.mgr.stats.buildings += this.count;
   }
 
   dispose() {
@@ -248,12 +254,13 @@ class Chunk {
     this.ground?.geometry.dispose();
     this.buildings?.geometry.dispose();
     this.structTop?.geometry.dispose();
+    this.lod2?.geometry.dispose();
     this.structSide?.geometry.dispose();
     this.trees?.userData.dispose();
     for (const t of this.textures.values()) t.dispose();
     this.material.dispose();
     this.mgr.collision.remove(this.prisms);
-    this.mgr.stats.buildings -= this.prisms.length;
+    this.mgr.stats.buildings -= this.count || 0;
   }
 }
 

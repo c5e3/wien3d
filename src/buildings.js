@@ -15,7 +15,7 @@ export async function fetchWfs(typeName, props, bbox, signal) {
  * (FMZKBKMOGD) whose footprint centroid lies inside the chunk.
  * O_KOTE = roof height, T_KOTE = terrain height, U_KOTE = underside (overhangs/bridges); all relative to Wiener Null.
  */
-export function buildBuildings(features, b, terrain) {
+export function buildBuildings(features, b, terrain, covered = () => false) {
   const pos = [];
   const uv = [];
   const prisms = [];
@@ -50,6 +50,9 @@ export function buildBuildings(features, b, terrain) {
       }
       cx /= outer.length; cz /= outer.length;
       if (cx < b.xMin || cx >= b.xMax || cz < b.zMin || cz >= b.zMax) continue; // owned by neighbour chunk
+      // replaced by the LOD2 roof model? (test centroid + a vertex pulled towards it, for L-shapes)
+      const [vx, vz] = outer[0];
+      if (covered(cx, cz) || covered(vx + (cx - vx) * 0.2, vz + (cz - vz) * 0.2)) continue;
 
       const top = WIENER_NULL + p.O_KOTE;
       const floating = p.U_KOTE != null && p.T_KOTE != null && p.U_KOTE > p.T_KOTE + 0.5;
@@ -100,13 +103,13 @@ export function buildBuildings(features, b, terrain) {
     }
   }
 
-  if (!pos.length) return { geometry: null, prisms };
+  if (!pos.length) return { geometry: null, prisms, count: prisms.length };
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geometry.computeVertexNormals(); // non-indexed => flat normals
   geometry.computeBoundingSphere();
-  return { geometry, prisms };
+  return { geometry, prisms, count: prisms.length };
 }
 
 // ---- Trees from the Vienna tree cadastre (BAUMKATOGD) --------------------------------------

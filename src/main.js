@@ -92,7 +92,7 @@ function updateHud(now) {
     `${lat.toFixed(5)}, ${lon.toFixed(5)}<br>` +
     `Alt ${Number.isNaN(p.y) ? '…' : p.y.toFixed(1)} m ü.A. · ${g !== null && !Number.isNaN(p.y) ? (p.y - g).toFixed(1) + ' m above ground' : ''}<br>` +
     `${mode}${player.sprinting ? ' · Sprint' : ''} · Speed ×${player.speedMult}<br>` +
-    `Building parts: ${chunks.stats.buildings} · Loading: ${chunks.pending}`;
+    `Buildings: ${chunks.stats.buildings} · Loading: ${chunks.pending}`;
   if (now - hashT > 2000 && !Number.isNaN(p.y)) {
     hashT = now;
     const ah = g !== null ? (p.y - g).toFixed(1) : 40;
