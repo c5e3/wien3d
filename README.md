@@ -49,6 +49,7 @@ No on-screen buttons, just gestures:
 | Drag one finger | move the crosshair like on a trackpad (swipe fast to whip around) |
 | Pinch | fly towards whatever the crosshair points at |
 | Spread | back away |
+| Two fingers left / right | slide sideways (works while pinching, too) |
 | Tap | info about what the crosshair points at |
 | Two-finger tap | close the info box / open the menu |
 

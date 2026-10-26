@@ -5,6 +5,8 @@ import * as THREE from 'three';
 //    (pointer acceleration)
 //  - pinching flies towards what the crosshair points at, spreading backs away; each step is a fraction of the
 //    distance to that point, so far targets come quickly and near ones gently
+//  - two fingers moving left / right together slide sideways, so the scene keeps pace with the fingers at the
+//    distance of what the crosshair points at (can be combined with pinching)
 //  - nothing moves on after the fingers stop or leave
 //  - a tap opens the info box for the crosshair, a two-finger tap acts like Esc
 const LOOK = 0.0028; // rad per CSS px at gain 1
@@ -23,7 +25,9 @@ export class TouchControls {
     this.target = new THREE.Vector3();
     this.pinchDist = 0;
     this.pending = 0; // metres to fly along the view since the last frame
+    this.pendingSide = 0; // metres to slide right since the last frame
     this.speed = 0; // m/s along the view
+    this.sideSpeed = 0; // m/s to the right
     this.lookPrev = null; // { x, y, t } of the steering finger
     this.dragView = false; // setting: drag the scene like a photo instead of steering the crosshair
     this.spreadToApproach = false; // setting: map-app style, spreading flies closer
@@ -61,6 +65,7 @@ export class TouchControls {
   beginPinch() {
     const [a, b] = this.pts.values();
     this.pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    this.midX = (a.x + b.x) / 2;
     this.pinchT = performance.now();
     const d = this.aimDistance() ?? FALLBACK_DIST;
     this.camera.getWorldDirection(this.target);
@@ -109,6 +114,13 @@ export class TouchControls {
     const dist = Math.max(3, Math.min(3000, this.camera.position.distanceTo(this.target)));
     const step = s < 1 ? dist * (1 - s ** g) : -dist * (s ** g - 1);
     this.pending += Math.max(-dist, Math.min(dist * 0.5, step));
+
+    // sideways: the screen width spans 2·dist·tan(hfov/2) at the target's distance
+    const mid = (a.x + b.x) / 2;
+    const cam = this.camera;
+    const span = 2 * dist * Math.tan((cam.fov * Math.PI) / 360) * cam.aspect;
+    this.pendingSide += ((mid - this.midX) / window.innerWidth) * span * (this.dragView ? -1 : 1);
+    this.midX = mid;
   }
 
   end(e) {
@@ -127,11 +139,17 @@ export class TouchControls {
   update(dt) {
     const p = this.player;
     const pinching = p.active && this.pts.size >= 2;
-    if (pinching) this.speed += (this.pending / Math.max(dt, 1e-3) - this.speed) * (1 - Math.exp(-dt * 20));
+    if (pinching) {
+      const a = 1 - Math.exp(-dt * 20), k = 1 / Math.max(dt, 1e-3);
+      this.speed += (this.pending * k - this.speed) * a;
+      this.sideSpeed += (this.pendingSide * k - this.sideSpeed) * a;
+    }
     // flight follows the fingers directly, and stops the moment they let go
-    p.touchSnap = pinching || this.speed !== 0;
-    if (!pinching) this.speed = 0;
-    this.pending = 0;
+    p.touchSnap = pinching || this.speed !== 0 || this.sideSpeed !== 0;
+    if (!pinching) this.speed = this.sideSpeed = 0;
+    this.pending = this.pendingSide = 0;
     this.camera.getWorldDirection(p.touchVel).multiplyScalar(this.speed);
+    p.touchVel.x += Math.cos(p.yaw) * this.sideSpeed;
+    p.touchVel.z -= Math.sin(p.yaw) * this.sideSpeed;
   }
 }
