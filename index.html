@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wien 3D</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #b8d3ea; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+      #crosshair { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; }
+      #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
+      #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+      #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+      #hud { position: fixed; left: 10px; top: 10px; color: #fff; font: 13px/1.45 ui-monospace, Consolas, monospace; text-shadow: 1px 1px 0 #000a; pointer-events: none; }
+      #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #0008; color: #fff; cursor: pointer; }
+      #overlay.hidden { display: none; }
+      .panel { background: #1b1f24ee; border-radius: 10px; padding: 24px 30px; max-width: 640px; box-shadow: 0 10px 40px #0007; }
+      .panel h1 { margin: 0 0 4px; font-size: 26px; }
+      .panel .sub { margin: 0 0 18px; color: #aab; font-size: 14px; }
+      .cols { display: flex; gap: 36px; font-size: 14px; }
+      .cols ul { list-style: none; margin: 0; padding: 0; line-height: 1.75; }
+      kbd, .cols b { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px; border-radius: 4px; background: #39404a; text-align: center; font: 12px/20px ui-monospace, Consolas, monospace; }
+      .start { margin-top: 20px; font-size: 18px; font-weight: 600; text-align: center; color: #9fd3ff; }
+      .credits { margin-top: 14px; font-size: 11px; color: #889; }
+    </style>
+  </head>
+  <body>
+    <div id="crosshair"></div>
+    <div id="hud"></div>
+    <div id="overlay">
+      <div class="panel">
+        <h1>Wien 3D</h1>
+        <p class="sub">Open Government Data Vienna &amp; Austria · creative mode</p>
+        <div class="cols">
+          <ul>
+            <li><kbd>W A S D</kbd> move</li>
+            <li><kbd>Mouse</kbd> look</li>
+            <li><kbd>Space</kbd> jump / fly up</li>
+            <li><kbd>Space</kbd><kbd>Space</kbd> toggle flying</li>
+            <li><kbd>Shift</kbd> sneak / fly down</li>
+            <li><kbd>W</kbd><kbd>W</kbd> / <kbd>Ctrl</kbd> / <kbd>R</kbd> sprint</li>
+            <li><kbd>Wheel</kbd> speed multiplier</li>
+            <li><kbd>N</kbd> noclip (spectator)</li>
+            <li><kbd>Esc</kbd> pause</li>
+          </ul>
+          <ul id="places"></ul>
+        </div>
+        <div class="start">Click to play</div>
+        <div class="credits">
+          Buildings &amp; trees: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthophoto: basemap.at (CC BY 4.0) ·
+          Bridges &amp; tunnels: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Terrain: DGM Österreich 10 m via AWS Terrain Tiles
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
