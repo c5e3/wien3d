@@ -41,7 +41,8 @@ export class Gamepads {
     const s = LOOK * p.lookSens * dt;
     if (this.drone) {
       const [t, r] = this.swapSticks ? [2, 0] : [0, 2]; // throttle / yaw stick, roll / pitch stick
-      const yaw = axis(t), lift = -axis(t + 1), pitch = axis(r + 1) * (this.invertY ? -1 : 1);
+      // like a drone: stick forwards tips the nose down
+      const yaw = axis(t), lift = -axis(t + 1), pitch = axis(r + 1) * (this.invertY ? 1 : -1);
       p.look(-Math.sign(yaw) * yaw * yaw * s, -Math.sign(pitch) * pitch * pitch * s);
       p.pad.up = Math.max(0, lift);
       p.pad.down = Math.max(0, -lift);
