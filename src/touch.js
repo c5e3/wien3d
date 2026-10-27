@@ -3,28 +3,28 @@ import * as THREE from 'three';
 // Touchscreen controls, no on-screen buttons:
 //  - one finger drags the map: the scene follows the finger, sliding sideways and forwards / backwards on the
 //    level, scaled to how far away what the crosshair points at is
-//  - two fingers moving together drag the view like a photo (settings invert either axis to steer the crosshair
-//    instead); faster swipes turn disproportionately further (pointer acceleration)
+//  - one finger starting inside the faint ring around the crosshair (#look-ring) drags the view like a photo
+//    instead (settings invert either axis to steer the crosshair); faster swipes turn disproportionately further
+//    (pointer acceleration)
 //  - twisting two fingers rotates the map around what the crosshair points at, like in map apps
 //  - nothing moves on after the fingers stop or leave; a finger left over from a multi-finger gesture does
 //    nothing until all fingers are up
-//  - a double tap opens the info box for the crosshair, a two-finger tap acts like Esc, a three-finger tap opens
-//    the POI list
+//  - a double tap opens the info box for the crosshair, a two-finger tap acts like Esc
 const LOOK = 0.0028; // rad per CSS px at gain 1
 const TAP_MS = 300;
 const TAP_PX = 12;
 const DOUBLE_MS = 350; // between the end of the first tap and the end of the second
 const DOUBLE_PX = 40;
 const FALLBACK_DIST = 250; // at the sky or beyond the pick range
+const RING_R = 48; // CSS px, radius of #look-ring in index.html
 
 export class TouchControls {
-  constructor(dom, { player, camera, aimDistance, onDoubleTap, onTwoFingerTap, onThreeFingerTap }) {
+  constructor(dom, { player, camera, aimDistance, onDoubleTap, onTwoFingerTap }) {
     this.player = player;
     this.camera = camera;
     this.aimDistance = aimDistance;
     this.onDoubleTap = onDoubleTap;
     this.onTwoFingerTap = onTwoFingerTap;
-    this.onThreeFingerTap = onThreeFingerTap;
     this.pts = new Map(); // identifier -> { x, y, x0, y0 }
     this.pivot = new THREE.Vector3(); // what twisting rotates the map around
     this.pivotDist = FALLBACK_DIST; // how far ahead along the view the pivot lies
@@ -39,9 +39,10 @@ export class TouchControls {
     this.fwdSpeed = 0; // m/s forwards on the level
     this.dragPrev = null; // { x, y } of the dragging finger
     this.dragDist = FALLBACK_DIST;
+    this.looking = false; // the single finger started inside the look ring
     this.lastTap = null; // { t, x, y } of the last one-finger tap, for double taps
-    this.invertX = false; // setting: two fingers left / right steer the crosshair instead of dragging the view
-    this.invertY = false; // setting: two fingers up / down steer the crosshair instead of dragging the view
+    this.invertX = false; // setting: looking left / right steers the crosshair instead of dragging the view
+    this.invertY = false; // setting: looking up / down steers the crosshair instead of dragging the view
 
     const opts = { passive: false };
     dom.addEventListener('touchstart', (e) => this.start(e), opts);
@@ -66,19 +67,21 @@ export class TouchControls {
     else this.beginDrag();
   }
 
-  /** The single finger drags from where it is now, at the distance of what the crosshair points at. */
+  /**
+   * The single finger drags from where it is now: the view if it came down inside the look ring, otherwise the
+   * map, at the distance of what the crosshair points at.
+   */
   beginDrag() {
     const [p] = this.pts.values();
     this.dragPrev = { x: p.x, y: p.y };
+    this.looking = Math.hypot(p.x - window.innerWidth / 2, p.y - window.innerHeight / 2) <= RING_R;
+    this.lookT = performance.now();
     this.dragDist = Math.max(3, Math.min(3000, this.aimDistance() ?? FALLBACK_DIST));
   }
 
   beginTwo() {
     const [a, b] = this.pts.values();
     this.angle = Math.atan2(b.y - a.y, b.x - a.x);
-    this.midX = (a.x + b.x) / 2;
-    this.midY = (a.y + b.y) / 2;
-    this.twoT = performance.now();
     this.pivotDist = Math.min(3000, this.aimDistance() ?? FALLBACK_DIST);
   }
 
@@ -93,7 +96,7 @@ export class TouchControls {
     }
     if (!this.player.active) return;
     // a finger left over from a multi-finger gesture doesn't drag: fingers rarely lift at exactly the same time
-    if (this.pts.size === 1 && this.maxTouches === 1) this.drag();
+    if (this.pts.size === 1 && this.maxTouches === 1) this.looking ? this.look() : this.drag();
     else if (this.pts.size >= 2) this.two();
   }
 
@@ -111,22 +114,23 @@ export class TouchControls {
     this.pendingFwd += ((p.y - prev.y) / window.innerHeight) * (spanV / tilt);
   }
 
-  two() {
-    const [a, b] = this.pts.values();
+  /** Drags the view, with trackpad-style acceleration: slow drags aim precisely, fast swipes turn around. */
+  look() {
+    const [p] = this.pts.values();
+    const prev = this.dragPrev;
+    this.dragPrev = { x: p.x, y: p.y };
+    if (!prev) return;
     const now = performance.now();
-    const dt = Math.max(1 / 240, (now - this.twoT) / 1000);
-    this.twoT = now;
-
-    // fingers moving together drag the view, with trackpad-style acceleration: slow drags aim precisely, fast
-    // swipes turn around
-    const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
-    const dx = midX - this.midX, dy = midY - this.midY;
-    this.midX = midX;
-    this.midY = midY;
+    const dt = Math.max(1 / 240, (now - this.lookT) / 1000);
+    this.lookT = now;
+    const dx = p.x - prev.x, dy = p.y - prev.y;
     const v = Math.hypot(dx, dy) / dt;
     const gain = Math.min(4, 0.4 + v / 900) * this.player.lookSens * LOOK;
     this.player.look(dx * gain * (this.invertX ? -1 : 1), dy * gain * (this.invertY ? -1 : 1));
+  }
 
+  two() {
+    const [a, b] = this.pts.values();
     // twisting: turn by the fingers' angle (clockwise on screen turns left, so the map turns along) and circle on
     // the level around the point the crosshair is on, at the distance it pointed at when the fingers came down
     const angle = Math.atan2(b.y - a.y, b.x - a.x);
@@ -163,9 +167,7 @@ export class TouchControls {
       return;
     }
     this.lastTap = null;
-    if (!tap) return;
-    if (this.maxTouches === 2) this.onTwoFingerTap();
-    else if (this.maxTouches === 3) this.onThreeFingerTap();
+    if (tap && this.maxTouches === 2) this.onTwoFingerTap();
   }
 
   update(dt) {

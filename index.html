@@ -36,6 +36,12 @@
       #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
       #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
       #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+      /* touch: one finger starting inside this ring looks around instead of moving the map (RING_R in touch.js);
+         only eighth-circle arcs on the diagonals are drawn */
+      #look-ring { display: none; position: fixed; left: 50%; top: 50%; width: 96px; height: 96px; transform: translate(-50%, -50%); box-sizing: border-box;
+        border: 2px solid #ffffff80; border-radius: 50%; pointer-events: none; mix-blend-mode: difference;
+        -webkit-mask: repeating-conic-gradient(from 22.5deg, #000 0 45deg, #0000 0 90deg); mask: repeating-conic-gradient(from 22.5deg, #000 0 45deg, #0000 0 90deg); }
+      @media (hover: none) and (pointer: coarse) { #look-ring { display: block; } #crosshair.hidden + #look-ring { display: none; } }
       #aim-label { position: fixed; left: 50%; top: calc(50% + 20px); transform: translateX(-50%); max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
         background: #ffffff80; border: 1px solid #d4d4d480; border-radius: var(--wien-radius); box-shadow: var(--wien-shadow); padding: 3px 9px; font-size: 13px; font-weight: 600; }
       #aim-label:empty { display: none; }
@@ -131,7 +137,13 @@
       #legal-body h3:first-child { border-top: 0; padding-top: 0; }
       #legal-body p { margin: 0 0 8px; }
       #legal-body ul { margin-bottom: 8px; }
-      #settings-body h3:first-child { border-top: 0; padding-top: 0; }
+      #settings-body details { border-top: 1px solid var(--wien-border); }
+      #settings-body summary { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; cursor: pointer; list-style: none;
+        font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+      #settings-body summary::-webkit-details-marker { display: none; }
+      #settings-body summary::after { content: ''; width: 6px; height: 6px; margin-right: 4px; border: solid var(--wien-text-muted); border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .15s; }
+      #settings-body details[open] summary::after { transform: rotate(-135deg); }
+      #settings-body details[open] { padding-bottom: 8px; }
       .set-row { display: grid; grid-template-columns: 1fr minmax(110px, 40%); gap: 2px 12px; align-items: center; padding: 6px 0; font-size: 13.5px; }
       .set-row > span { grid-row: span 2; }
       .set-row small { display: block; color: var(--wien-text-muted); font-size: 11.5px; line-height: 1.4; }
@@ -179,6 +191,7 @@
   </head>
   <body>
     <div id="crosshair"></div>
+    <div id="look-ring"></div>
     <div id="aim-label"></div>
     <div id="mouse-mode" class="hidden" data-i18n="mouse.hint"></div>
     <div id="corner-tl" class="corner tl"><div id="hud" class="hidden"></div><div id="compass" class="hidden" aria-hidden="true"></div></div>
@@ -225,7 +238,6 @@
             <li data-i18n="touch.rotate"></li>
             <li data-i18n="touch.4"></li>
             <li data-i18n="touch.5"></li>
-            <li data-i18n="touch.6"></li>
           </ul></div>
           <div><h3 data-i18n="menu.controller"></h3><ul>
             <li data-i18n="pad.1"></li>

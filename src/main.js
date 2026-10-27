@@ -284,7 +284,6 @@ const touch = new TouchControls(renderer.domElement, {
   aimDistance: () => info.aimDistance(),
   onDoubleTap: () => player.active && info.click(),
   onTwoFingerTap: () => player.active && escape(),
-  onThreeFingerTap: () => player.active && openPois(),
 });
 
 // controller: Start = menu, RB / A = info, LB / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
@@ -335,6 +334,7 @@ function applySetting(k, v) {
   else if (k === 'padSwapSticks') gamepads.swapSticks = v;
   else if (k === 'touchInvertX') touch.invertX = v;
   else if (k === 'touchInvertY') touch.invertY = v;
+  else if (k === 'showLookRing') document.getElementById('look-ring').classList.toggle('hidden', !v);
   else if (k === 'padDrone') gamepads.drone = v;
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
   else if (k === 'showCompass') compass.setVisible(v);

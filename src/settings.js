@@ -17,6 +17,7 @@ export const DEFAULTS = {
   padDrone: false,
   touchInvertX: false,
   touchInvertY: false,
+  showLookRing: true,
   showStats: false,
   showCompass: true,
   showStreetNames: false,
@@ -28,7 +29,7 @@ const km = (m) =>
   m < 1000 ? `${Math.round(m / 50) * 50} m` : `${(m / 1000).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 export const viewDistance = (range) => (range + 3) * CHUNK_M * 1.065; // fog end; 2600 m at the default
 
-// rendered top to bottom; label / hint / section are i18n keys
+// rendered top to bottom, each section collapsible; label / hint / section are i18n keys
 const SCHEMA = [
   { key: 'lang', label: 'set.lang', type: 'select', options: LANGS },
   { section: 'set.display' },
@@ -57,6 +58,7 @@ const SCHEMA = [
   { section: 'set.touch' },
   { key: 'touchInvertX', label: 'set.touchInvertX', type: 'check' },
   { key: 'touchInvertY', label: 'set.touchInvertY', type: 'check', hint: 'set.touchInvert.hint' },
+  { key: 'showLookRing', label: 'set.showLookRing', type: 'check', hint: 'set.showLookRing.hint' },
 ];
 
 function load() {
@@ -74,6 +76,12 @@ export class Settings {
     this.onChange = () => {};
     this.panel = document.getElementById('settings-panel');
     this.body = document.getElementById('settings-body');
+    this.openSections = new Set(); // section keys expanded in this visit; all start collapsed
+    // toggle doesn't bubble
+    this.body.addEventListener('toggle', (e) => {
+      const k = e.target.dataset.section;
+      if (k) e.target.open ? this.openSections.add(k) : this.openSections.delete(k);
+    }, true);
     document.getElementById('settings-reset').addEventListener('click', () => {
       for (const [k, v] of Object.entries(DEFAULTS)) this.set(k, v);
       this.render();
@@ -119,8 +127,13 @@ export class Settings {
   }
 
   render() {
+    let inSection = false;
     this.body.innerHTML = SCHEMA.map((r) => {
-      if (r.section) return `<h3>${t(r.section)}</h3>`;
+      if (r.section) {
+        const html = `${inSection ? '</details>' : ''}<details data-section="${r.section}"${this.openSections.has(r.section) ? ' open' : ''}><summary>${t(r.section)}</summary>`;
+        inSection = true;
+        return html;
+      }
       if (r.status) return '<p class="pad-status"></p>';
       const v = this.values[r.key];
       const label = t(r.label), hint = r.hint ? `<small>${t(r.hint)}</small>` : '';
@@ -133,7 +146,7 @@ export class Settings {
       return `<label class="set-row"><span>${label}${hint}</span>
         <input type="range" data-key="${r.key}" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" />
         <output data-key="${r.key}">${r.fmt(v)}</output></label>`;
-    }).join('');
+    }).join('') + (inSection ? '</details>' : '');
     this.renderStatus();
   }
 
