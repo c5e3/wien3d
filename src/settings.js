@@ -17,6 +17,7 @@ export const DEFAULTS = {
   padDrone: false,
   touchInvertX: false,
   touchInvertY: false,
+  touchInvertLift: false,
   showLookRing: true,
   showStats: false,
   showCompass: true,
@@ -58,6 +59,7 @@ const SCHEMA = [
   { section: 'set.touch' },
   { key: 'touchInvertX', label: 'set.touchInvertX', type: 'check' },
   { key: 'touchInvertY', label: 'set.touchInvertY', type: 'check', hint: 'set.touchInvert.hint' },
+  { key: 'touchInvertLift', label: 'set.touchInvertLift', type: 'check', hint: 'set.touchInvertLift.hint' },
   { key: 'showLookRing', label: 'set.showLookRing', type: 'check', hint: 'set.showLookRing.hint' },
 ];
 

@@ -6,24 +6,27 @@ import * as THREE from 'three';
 //  - one finger starting inside the faint ring around the crosshair (#look-ring) drags the view like a photo
 //    instead (settings invert either axis to steer the crosshair); faster swipes turn disproportionately further
 //    (pointer acceleration)
-//  - twisting two fingers rotates the map around what the crosshair points at, like in map apps
+//  - two fingers swiped up / down fly straight down / up, the scene following them (a setting inverts it), twisting them rotates the map
+//    around what the crosshair points at, like in map apps; each two-finger gesture locks to whichever of the
+//    two it starts with, so a lift never turns into a twist halfway through or vice versa
 //  - nothing moves on after the fingers stop or leave; a finger left over from a multi-finger gesture does
 //    nothing until all fingers are up
-//  - a double tap opens the info box for the crosshair, a two-finger tap acts like Esc
+//  - a tap opens the info box for the crosshair, or closes it if it's open (taps on the box itself don't reach
+//    the canvas); a two-finger tap acts like Esc
 const LOOK = 0.0028; // rad per CSS px at gain 1
 const TAP_MS = 300;
 const TAP_PX = 12;
-const DOUBLE_MS = 350; // between the end of the first tap and the end of the second
-const DOUBLE_PX = 40;
 const FALLBACK_DIST = 250; // at the sky or beyond the pick range
 const RING_R = 48; // CSS px, radius of #look-ring in index.html
+const TWIST_MIN_PX = 60; // closer fingers give a noisy angle, so they don't twist by accident
+const LOCK_PX = 14; // how far a two-finger gesture moves (lift) or turns (arc per finger) before it's decided
 
 export class TouchControls {
-  constructor(dom, { player, camera, aimDistance, onDoubleTap, onTwoFingerTap }) {
+  constructor(dom, { player, camera, aimDistance, onTap, onTwoFingerTap }) {
     this.player = player;
     this.camera = camera;
     this.aimDistance = aimDistance;
-    this.onDoubleTap = onDoubleTap;
+    this.onTap = onTap;
     this.onTwoFingerTap = onTwoFingerTap;
     this.pts = new Map(); // identifier -> { x, y, x0, y0 }
     this.pivot = new THREE.Vector3(); // what twisting rotates the map around
@@ -33,24 +36,28 @@ export class TouchControls {
     this.pendingZ = 0; // metres to move in world z since the last frame, from twisting
     this.pendingSide = 0; // metres to slide right since the last frame
     this.pendingFwd = 0; // metres to fly forwards on the level since the last frame
+    this.pendingUp = 0; // metres to fly up since the last frame
     this.vx = 0; // m/s in world x
     this.vz = 0; // m/s in world z
     this.sideSpeed = 0; // m/s to the right
     this.fwdSpeed = 0; // m/s forwards on the level
+    this.upSpeed = 0; // m/s up
     this.dragPrev = null; // { x, y } of the dragging finger
     this.dragDist = FALLBACK_DIST;
     this.looking = false; // the single finger started inside the look ring
-    this.lastTap = null; // { t, x, y } of the last one-finger tap, for double taps
     this.invertX = false; // setting: looking left / right steers the crosshair instead of dragging the view
     this.invertY = false; // setting: looking up / down steers the crosshair instead of dragging the view
+    this.invertLift = false; // setting: swiping two fingers up flies up
 
     const opts = { passive: false };
     dom.addEventListener('touchstart', (e) => this.start(e), opts);
     dom.addEventListener('touchmove', (e) => this.move(e), opts);
     dom.addEventListener('touchend', (e) => this.end(e), opts);
     dom.addEventListener('touchcancel', (e) => this.end(e), opts);
-    // iOS Safari pinch-zooms the page despite touch-action
-    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    // no pinch-zoom of the page, also when a finger lands outside the canvas: browsers (iOS Safari especially)
+    // don't always honour user-scalable=no and touch-action
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, (e) => e.preventDefault());
+    document.addEventListener('touchmove', (e) => e.touches.length > 1 && e.preventDefault(), opts);
   }
 
   start(e) {
@@ -82,6 +89,9 @@ export class TouchControls {
   beginTwo() {
     const [a, b] = this.pts.values();
     this.angle = Math.atan2(b.y - a.y, b.x - a.x);
+    this.midY = (a.y + b.y) / 2;
+    this.twoMode = null; // 'lift' or 'twist' once decided
+    this.liftAcc = this.twistAcc = 0; // px moved / turned while undecided
     this.pivotDist = Math.min(3000, this.aimDistance() ?? FALLBACK_DIST);
   }
 
@@ -131,12 +141,34 @@ export class TouchControls {
 
   two() {
     const [a, b] = this.pts.values();
-    // twisting: turn by the fingers' angle (clockwise on screen turns left, so the map turns along) and circle on
-    // the level around the point the crosshair is on, at the distance it pointed at when the fingers came down
+    const sep = Math.hypot(b.x - a.x, b.y - a.y);
+    const midY = (a.y + b.y) / 2;
+    const dy = midY - this.midY;
+    this.midY = midY;
     const angle = Math.atan2(b.y - a.y, b.x - a.x);
     let da = angle - this.angle;
     this.angle = angle;
     da = Math.atan2(Math.sin(da), Math.cos(da));
+    if (sep < TWIST_MIN_PX) da = 0;
+
+    if (!this.twoMode) {
+      this.liftAcc += dy;
+      this.twistAcc += (da * sep) / 2;
+      const lift = Math.abs(this.liftAcc), twist = Math.abs(this.twistAcc);
+      if (Math.max(lift, twist) < LOCK_PX) return;
+      this.twoMode = lift > twist ? 'lift' : 'twist';
+    }
+
+    if (this.twoMode === 'lift') {
+      // like the one-finger drag, the scene follows the fingers (swiping up lowers the view), and a swipe across
+      // the screen covers what the screen spans at the aimed distance
+      const spanV = 2 * Math.max(3, this.pivotDist) * Math.tan((this.camera.fov * Math.PI) / 360);
+      this.pendingUp += (dy / window.innerHeight) * spanV * (this.invertLift ? -1 : 1);
+      return;
+    }
+
+    // twisting: turn by the fingers' angle (clockwise on screen turns left, so the map turns along) and circle on
+    // the level around the point the crosshair is on, at the distance it pointed at when the fingers came down
     if (!da) return;
     const pos = this.camera.position;
     this.camera.getWorldDirection(this.pivot).multiplyScalar(this.pivotDist).add(pos);
@@ -149,25 +181,14 @@ export class TouchControls {
 
   end(e) {
     e.preventDefault();
-    let last = null;
-    for (const t of e.changedTouches) {
-      last = this.pts.get(t.identifier) ?? last;
-      this.pts.delete(t.identifier);
-    }
+    for (const t of e.changedTouches) this.pts.delete(t.identifier);
     this.dragPrev = null;
     if (this.pts.size >= 2) this.beginTwo();
     if (this.pts.size) return;
     const tap = !this.moved && e.timeStamp - this.t0 < TAP_MS;
-    if (tap && this.maxTouches === 1 && last) {
-      const prev = this.lastTap;
-      if (prev && e.timeStamp - prev.t < DOUBLE_MS && Math.hypot(last.x - prev.x, last.y - prev.y) < DOUBLE_PX) {
-        this.lastTap = null;
-        this.onDoubleTap();
-      } else this.lastTap = { t: e.timeStamp, x: last.x, y: last.y };
-      return;
-    }
-    this.lastTap = null;
-    if (tap && this.maxTouches === 2) this.onTwoFingerTap();
+    if (!tap) return;
+    if (this.maxTouches === 1) this.onTap();
+    else if (this.maxTouches === 2) this.onTwoFingerTap();
   }
 
   update(dt) {
@@ -179,12 +200,14 @@ export class TouchControls {
       this.vz += (this.pendingZ * k - this.vz) * a;
       this.sideSpeed += (this.pendingSide * k - this.sideSpeed) * a;
       this.fwdSpeed += (this.pendingFwd * k - this.fwdSpeed) * a;
+      // a little softer: touch events and frames don't line up, so the per-frame lift comes in uneven steps
+      this.upSpeed += (this.pendingUp * k - this.upSpeed) * (1 - Math.exp(-dt * 12));
     }
     // flight follows the fingers directly, and stops the moment they let go
-    p.touchSnap = touching || this.vx !== 0 || this.vz !== 0 || this.sideSpeed !== 0 || this.fwdSpeed !== 0;
-    if (!touching) this.vx = this.vz = this.sideSpeed = this.fwdSpeed = 0;
-    this.pendingX = this.pendingZ = this.pendingSide = this.pendingFwd = 0;
-    p.touchVel.set(this.vx, 0, this.vz);
+    p.touchSnap = touching || this.vx !== 0 || this.vz !== 0 || this.sideSpeed !== 0 || this.fwdSpeed !== 0 || this.upSpeed !== 0;
+    if (!touching) this.vx = this.vz = this.sideSpeed = this.fwdSpeed = this.upSpeed = 0;
+    this.pendingX = this.pendingZ = this.pendingSide = this.pendingFwd = this.pendingUp = 0;
+    p.touchVel.set(this.vx, this.upSpeed, this.vz);
     // same directions as D and W in player.js
     p.touchVel.x += Math.cos(p.yaw) * this.sideSpeed - Math.sin(p.yaw) * this.fwdSpeed;
     p.touchVel.z -= Math.sin(p.yaw) * this.sideSpeed + Math.cos(p.yaw) * this.fwdSpeed;

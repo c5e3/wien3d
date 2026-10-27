@@ -50,13 +50,14 @@ No on-screen buttons, just gestures:
 
 | Gesture | What it does |
 | --- | --- |
+| Two-finger tap | close the info box / open the menu (with the POI browser) |
+| Tap | info about what the crosshair points at; tap outside the info box to close it |
 | Drag one finger | move the map: the city follows your finger, sideways and forwards / backwards on the level |
 | Drag from the circle around the crosshair | look around; the view moves like a photo, so swiping up looks down and swiping left looks right (swipe fast to whip around) |
+| Swipe two fingers up / down | fly straight down / up: the city follows your fingers, so swiping up lowers you |
 | Twist two fingers | rotate the map around whatever the crosshair points at |
-| Double-tap | info about what the crosshair points at |
-| Two-finger tap | close the info box / open the menu (with the POI browser) |
 
-You only move while your fingers do. Prefer steering the crosshair instead of dragging the view? Invert the look left / right and up / down axes separately in **Settings**. The circle around the crosshair can be hidden there too; swiping from inside it keeps working.
+You only move while your fingers do. Prefer steering the crosshair instead of dragging the view? Invert the look left / right and up / down axes separately in **Settings**, and the two-finger up / down as well. The circle around the crosshair can be hidden there too; swiping from inside it keeps working.
 
 ### Controller 🎮
 

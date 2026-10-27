@@ -25,7 +25,8 @@
       }
       html, body { margin: 0; height: 100%; overflow: hidden; background: #b8d3ea; color: var(--wien-text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
       canvas { display: block; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-      html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+      /* no pinch / double-tap page zoom anywhere (it shifts the look ring off its hitbox); panels still scroll */
+      html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; touch-action: pan-x pan-y; }
       .hidden { display: none !important; }
       body.soft-play, body.soft-play * { cursor: none !important; }
       h1, h2, h3 { letter-spacing: -.005em; }
@@ -233,11 +234,12 @@
             <li data-i18n="kb.9"></li>
           </ul></div>
           <div class="touch-only"><h3 data-i18n="menu.touch"></h3><ul>
+            <li class="lead" data-i18n="touch.5"></li>
+            <li data-i18n="touch.4"></li>
             <li data-i18n="touch.1"></li>
             <li data-i18n="touch.look"></li>
+            <li data-i18n="touch.lift"></li>
             <li data-i18n="touch.rotate"></li>
-            <li data-i18n="touch.4"></li>
-            <li data-i18n="touch.5"></li>
           </ul></div>
           <div><h3 data-i18n="menu.controller"></h3><ul>
             <li data-i18n="pad.1"></li>

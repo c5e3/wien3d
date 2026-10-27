@@ -282,7 +282,7 @@ const touch = new TouchControls(renderer.domElement, {
   player,
   camera,
   aimDistance: () => info.aimDistance(),
-  onDoubleTap: () => player.active && info.click(),
+  onTap: () => player.active && (info.open ? info.close() : info.click()),
   onTwoFingerTap: () => player.active && escape(),
 });
 
@@ -334,6 +334,7 @@ function applySetting(k, v) {
   else if (k === 'padSwapSticks') gamepads.swapSticks = v;
   else if (k === 'touchInvertX') touch.invertX = v;
   else if (k === 'touchInvertY') touch.invertY = v;
+  else if (k === 'touchInvertLift') touch.invertLift = v;
   else if (k === 'showLookRing') document.getElementById('look-ring').classList.toggle('hidden', !v);
   else if (k === 'padDrone') gamepads.drone = v;
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
