@@ -1,21 +1,25 @@
 import * as THREE from 'three';
 import { lonLatToWorld, worldToLonLat } from './geo.js';
+import { structuresReady, bridgesAt, deckAt } from './structures.js';
 
 // Street names from the Stadt Wien street graph (GIP), as flat white text boxes floating a set height above the
-// terrain along the street. Loaded around the player; segments of a street are joined into chains, which get a
-// label every SPACING m, kept straight, off buildings and clear of each other. The text turns in the shader so
-// it never reads upside down.
+// terrain, or parallel to the deck where the label lies over a bridge. Loaded around the player; segments of a street
+// are joined into chains, which get a label every SPACING m, kept straight, off buildings, clear of each other and,
+// where possible, out of tree crowns. The text turns in the shader so it never reads upside down.
 const WFS =
   'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json&typeName=ogdwien:STRASSENGRAPHOGD';
 const SPACING = 400; // m between labels along a street
 const DEDUP = 150; // m: no second label of the same name this close (dual carriageways, crossings)
 const STEP = 5; // m: terrain sample spacing along a label
+const BRIDGE_STEP = 2; // m: sample spacing along a label when looking for a bridge below it
+const MAX_SLOPE = 0.08; // steepest a label on a bridge is tilted along its length
+const TCELL = 32; // m: spatial hash of trees
 const SLIDE = 8, SLIDE_MAX = 80; // m: a blocked label tries spots up to this far apart along its street, up to this far
 const SHRINK = 0.8, MIN_H = 2; // a label that doesn't fit anywhere tries again this much smaller, down to this box height (m)
 const BENT = 0.35; // share of the box height the street may bend away from the box
 const MARGIN = 1.5; // m kept free between two labels
 const CELL = 64; // m: spatial hash of placed labels
-const RELAYOUT = 2; // s: at most this often re-place labels after buildings loaded
+const RELAYOUT = 2; // s: at most this often re-place labels after buildings or trees loaded
 const PAGE = 2048; // atlas page size (px)
 const FONT_PX = 32, ROW = 44, PAD = 14, GAP = 4; // text, box height, inner padding, gap between boxes
 const FONT = `600 ${FONT_PX}px 'Open Sans Variable', 'Helvetica Neue', 'Segoe UI', sans-serif`;
@@ -204,6 +208,7 @@ export class StreetNames {
         fetch(`${WFS}&bbox=${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat},EPSG:4326`, { signal: abort.signal }).then((res) => res.json()),
         this.terrain.ensure({ xMin: p.x - r, xMax: p.x + r, zMin: p.z - r, zMax: p.z + r }),
         document.fonts.load(FONT),
+        structuresReady,
       ]);
       if (abort.signal.aborted) return;
       this.setData(this.prepare(j.features || []));
@@ -245,8 +250,34 @@ export class StreetNames {
     };
   }
 
-  /** Nearest spot to the slot that is straight enough, off buildings and clear of other labels, or null. */
-  place(slot, grid, named) {
+  /**
+   * Ground along the box's centre line, every STEP m: where the line crosses a bridge footprint anywhere, a straight
+   * line fitted to that bridge's deck along the box (so the whole label lies on the bridge, parallel to its deck,
+   * even where it reaches past it), otherwise the terrain.
+   */
+  groundLine(r) {
+    const hits = new Map(); // bridge -> [t, deck height] samples
+    for (let t = -r.hl; t <= r.hl; t += BRIDGE_STEP) {
+      const x = r.cx + r.dx * t, z = r.cz + r.dz * t;
+      for (const b of bridgesAt(x, z)) (hits.get(b) ?? hits.set(b, []).get(b)).push([t, deckAt(b, x, z)]);
+    }
+    const n = Math.max(1, Math.ceil(r.L / STEP)), ts = [];
+    for (let i = 0; i <= n; i++) ts.push((i / n - 0.5) * r.L);
+    if (!hits.size) return ts.map((t) => this.terrain.heightAt(r.cx + r.dx * t, r.cz + r.dz * t) ?? 170);
+    // the bridge under most of the label; least squares y = y0 + k t over its samples
+    const pts = [...hits.values()].reduce((m, p) => (p.length > m.length ? p : m));
+    const mt = pts.reduce((a, p) => a + p[0], 0) / pts.length, my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+    let num = 0, den = 0;
+    for (const [t, y] of pts) (num += (t - mt) * (y - my)), (den += (t - mt) ** 2);
+    // no steeper than a street (a label crossing the deck at an angle sees only a short, skewed piece of it),
+    // and nowhere below the deck
+    const k = Math.max(-MAX_SLOPE, Math.min(MAX_SLOPE, den > 1e-6 ? num / den : 0));
+    const lift = Math.max(...pts.map(([t, y]) => y - (my + k * (t - mt))));
+    return ts.map((t) => my + lift + k * (t - mt));
+  }
+
+  /** Nearest spot to the slot that is straight enough, off buildings and clear of other labels (and of trees), or null. */
+  place(slot, grid, named, trees) {
     const c = slot.chain, { pts, cum, e } = c;
     const H = boxHeight(c.frc);
     for (let h = H; h >= Math.min(H, MIN_H); h *= SHRINK) {
@@ -263,7 +294,9 @@ export class StreetNames {
           if (bend(pts, cum, s - L / 2, s + L / 2, a, d) > h * BENT) continue;
           const r = { cx: (a[0] + b[0]) / 2, cz: (a[1] + b[1]) / 2, dx: d[0], dz: d[1], hl: dl / 2, hh: h / 2, L: dl, h, e };
           if (named.get(c.name)?.some((q) => Math.hypot(q.cx - r.cx, q.cz - r.cz) < DEDUP)) return null;
-          if (this.hitsLabel(r, grid) || this.hitsBuilding(r)) continue;
+          if (this.hitsLabel(r, grid)) continue;
+          r.ys = this.groundLine(r);
+          if (this.hitsBuilding(r) || (trees && this.hitsTree(r, trees))) continue;
           return r;
         }
     }
@@ -279,26 +312,71 @@ export class StreetNames {
     return false;
   }
 
-  /** The box, as a row of circles along it, cuts through a building (not one passing above or ending below it). */
+  /** Height of the box at offset t (-hl ... hl) along it. */
+  yAt(r, t) {
+    const k = r.ys.length - 1;
+    return r.ys[Math.min(k, Math.max(0, Math.round(((t + r.hl) / r.L) * k)))] + this.hover;
+  }
+
+  /** The box, as a row of circles along it, cuts through a building or bridge (not one passing above or ending below it). */
   hitsBuilding(r) {
     const rad = r.hh * 0.9, n = Math.max(1, Math.ceil((r.L - 2 * rad) / rad));
     for (let i = 0; i <= n; i++) {
       const t = -r.hl + rad + ((r.L - 2 * rad) * i) / n;
       const x = r.cx + r.dx * t, z = r.cz + r.dz * t;
-      const g = this.terrain.heightAt(x, z) ?? 170;
-      const y = g + this.hover;
+      const y = this.yAt(r, t);
       if (this.chunks.collision.query(x, z, rad).some((p) => p.bottom < y + 2 && p.top > y - 0.5)) return true;
     }
     return false;
+  }
+
+  /** The box passes through a tree's crown or trunk (shaped as in buildTrees) at its height there. */
+  hitsTree(r, trees) {
+    const R = r.hl + r.hh + 15; // + largest crown radius
+    for (let ix = Math.floor((r.cx - R) / TCELL); ix <= Math.floor((r.cx + R) / TCELL); ix++)
+      for (let iz = Math.floor((r.cz - R) / TCELL); iz <= Math.floor((r.cz + R) / TCELL); iz++)
+        for (const t of trees.get(`${ix},${iz}`) ?? []) {
+          const px = t.x - r.cx, pz = t.z - r.cz;
+          const u = px * r.dx + pz * r.dz, v = px * r.dz - pz * r.dx;
+          const dist = Math.hypot(Math.max(0, Math.abs(u) - r.hl), Math.max(0, Math.abs(v) - r.hh));
+          if (dist > t.d / 2) continue;
+          const y = this.yAt(r, Math.max(-r.hl, Math.min(r.hl, u)));
+          const trunkH = t.h * 0.4, crownBase = t.g + trunkH * 0.8, crownH = t.h - trunkH * 0.8;
+          let rad = y < t.g + trunkH ? 0.2 * (1 + t.d * 0.05) : 0;
+          const e = (y - crownBase - crownH / 2) / (crownH / 2);
+          if (Math.abs(e) < 1) rad = Math.max(rad, (t.d / 2) * Math.sqrt(1 - e * e));
+          if (dist < rad) return true;
+        }
+    return false;
+  }
+
+  /** Trees of every loaded chunk by TCELL cell. */
+  treeGrid() {
+    const grid = new Map();
+    for (const ch of this.chunks.chunks.values()) {
+      if (!ch.rev) continue;
+      const seen = new Set();
+      for (const o of ch.pickables()) {
+        const items = o.userData.pick === 'tree' && o.userData.items;
+        if (!items || seen.has(items)) continue; // trunks and crowns share one list
+        seen.add(items);
+        for (const t of items) {
+          const k = `${Math.floor(t.x / TCELL)},${Math.floor(t.z / TCELL)}`;
+          (grid.get(k) ?? grid.set(k, []).get(k)).push(t);
+        }
+      }
+    }
+    return grid;
   }
 
   layout() {
     if (!this.data) return;
     this.layoutRev = this.chunks.rev;
     const { slots, pages } = this.data;
-    const grid = new Map(), named = new Map(), labels = [];
+    const grid = new Map(), named = new Map(), labels = [], trees = this.treeGrid();
     for (const slot of slots) {
-      const r = this.place(slot, grid, named);
+      // rather a label in a tree than none
+      const r = this.place(slot, grid, named, trees) ?? this.place(slot, grid, named, null);
       if (!r) continue;
       labels.push(r);
       (named.get(slot.chain.name) ?? named.set(slot.chain.name, []).get(slot.chain.name)).push(r);
@@ -310,17 +388,17 @@ export class StreetNames {
         }
     }
 
-    // one mesh per atlas page: a strip per label, every vertex on the terrain + hover
+    // one mesh per atlas page: a strip per label, hover above the ground sampled along its centre line
     const geo = pages.map(() => ({ pos: [], uv: [], rect: [], dir: [], idx: [] }));
-    for (const { cx, cz, dx, dz, L, h, e } of labels) {
+    for (const { cx, cz, dx, dz, L, h, e, ys } of labels) {
       const g = geo[e.page], [u0, v0, u1, v1] = e.rect;
       const nx = dz, nz = -dx; // towards the text's top: away from a camera whose screen right is (dx, dz)
-      const k = Math.max(1, Math.ceil(L / STEP)), base = g.pos.length / 3;
+      const k = ys.length - 1, base = g.pos.length / 3;
       for (let i = 0; i <= k; i++) {
         const t = i / k, px = cx + dx * (t - 0.5) * L, pz = cz + dz * (t - 0.5) * L;
         for (const [side, v] of [[-0.5, v0], [0.5, v1]]) {
           const x = px + nx * side * h, z = pz + nz * side * h;
-          g.pos.push(x, (this.terrain.heightAt(x, z) ?? 170) + this.hover, z);
+          g.pos.push(x, ys[i] + this.hover, z);
           g.uv.push(u0 + (u1 - u0) * t, v);
           g.rect.push(u0, v0, u1, v1);
           g.dir.push(dx, dz);

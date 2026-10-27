@@ -57,6 +57,41 @@ export function structureAt(x, z) {
   return null;
 }
 
+/** Deck top of bridge s at (x, z), interpolated over its triangles, or null outside its footprint. */
+export function deckAt(s, x, z) {
+  if (s.kind === 't' || x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) return null;
+  const { x: X, z: Z, a, tris } = s;
+  for (let t = 0; t < tris.length; t += 3) {
+    const i = tris[t], j = tris[t + 1], k = tris[t + 2];
+    const det = (Z[j] - Z[k]) * (X[i] - X[k]) + (X[k] - X[j]) * (Z[i] - Z[k]);
+    if (!det) continue;
+    const u = ((Z[j] - Z[k]) * (x - X[k]) + (X[k] - X[j]) * (z - Z[k])) / det;
+    const v = ((Z[k] - Z[i]) * (x - X[k]) + (X[i] - X[k]) * (z - Z[k])) / det;
+    if (u >= -1e-6 && v >= -1e-6 && u + v <= 1 + 1e-6) return u * a[i] + v * a[j] + (1 - u - v) * a[k];
+  }
+  return null;
+}
+
+// bridges by 100 m cell, for bridgesAt
+const BCELL = 100;
+let bgrid = null;
+
+/** Bridges whose footprint contains (x, z). */
+export function bridgesAt(x, z) {
+  if (!bgrid) {
+    bgrid = new Map();
+    for (const s of list) {
+      if (s.kind === 't') continue;
+      for (let ix = Math.floor(s.minX / BCELL); ix <= Math.floor(s.maxX / BCELL); ix++)
+        for (let iz = Math.floor(s.minZ / BCELL); iz <= Math.floor(s.maxZ / BCELL); iz++) {
+          const k = `${ix},${iz}`;
+          (bgrid.get(k) ?? bgrid.set(k, []).get(k)).push(s);
+        }
+    }
+  }
+  return (bgrid.get(`${Math.floor(x / BCELL)},${Math.floor(z / BCELL)}`) ?? []).filter((s) => deckAt(s, x, z) !== null);
+}
+
 const overlaps = (s, bd, pad = 0) => s.maxX >= bd.xMin - pad && s.minX <= bd.xMax + pad && s.maxZ >= bd.zMin - pad && s.minZ <= bd.zMax + pad;
 
 /** Tunnel footprints touching the bounds, as polygon-clipping polygons ([[x,z],...] rings). */
