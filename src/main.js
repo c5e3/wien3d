@@ -6,6 +6,7 @@ import { Collision } from './collision.js';
 import { ChunkManager } from './chunks.js';
 import { Player } from './player.js';
 import { PoiManager } from './poi.js';
+import { StreetNames } from './streets.js';
 import { InfoUI } from './info.js';
 import { TouchControls } from './touch.js';
 import { Riesenrad } from './riesenrad.js';
@@ -37,6 +38,7 @@ const collision = new Collision();
 const chunks = new ChunkManager({ scene, terrain, collision, renderer });
 const player = new Player(camera, renderer.domElement, terrain, collision);
 const pois = new PoiManager({ scene, terrain, player, chunks });
+const streets = new StreetNames({ scene, terrain, player, renderer });
 const info = new InfoUI({ camera, chunks, pois });
 const riesenrad = new Riesenrad({ scene, terrain });
 info.extra = riesenrad.pickables;
@@ -322,6 +324,7 @@ function applySetting(k, v) {
     camera.far = far * 2.3;
     camera.updateProjectionMatrix();
     pois.setRange(far);
+    streets.setRange(far);
   } else if (k === 'resolution') renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * v);
   else if (k === 'fov') player.baseFov = v;
   else if (k === 'speed') player.speedIdx = v;
@@ -334,6 +337,7 @@ function applySetting(k, v) {
   else if (k === 'touchPinchToApproach') touch.pinchToApproach = v;
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
   else if (k === 'showCompass') compass.setVisible(v);
+  else if (k === 'showStreetNames') streets.setVisible(v);
   else if (k === 'compassCorner') compass.setCorner(v);
 }
 // the menu's control lists show the inputs as currently set up
@@ -411,6 +415,7 @@ function frame(now) {
   chunks.update(player.pos);
   riesenrad.update(dt);
   pois.update(dt);
+  streets.update(dt, camera);
   info.update(dt, player.active || shot);
   updateHud(now);
   compass.update(player.yaw);
@@ -419,4 +424,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__wien = { player, chunks, terrain, camera, pois, info, riesenrad };
+window.__wien = { player, chunks, terrain, camera, pois, streets, info, riesenrad };

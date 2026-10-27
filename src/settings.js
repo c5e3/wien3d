@@ -19,6 +19,7 @@ export const DEFAULTS = {
   touchPinchToApproach: false,
   showStats: false,
   showCompass: true,
+  showStreetNames: false,
   compassCorner: 'tl', // tl / tr / bl / br
 };
 
@@ -32,6 +33,7 @@ const SCHEMA = [
   { section: 'set.display' },
   { key: 'showStats', label: 'set.showStats', type: 'check' },
   { key: 'showCompass', label: 'set.showCompass', type: 'check' },
+  { key: 'showStreetNames', label: 'set.showStreetNames', type: 'check', hint: 'set.showStreetNames.hint' },
   { key: 'compassCorner', label: 'set.compassCorner', type: 'select',
     options: () => Object.fromEntries(['tl', 'tr', 'bl', 'br'].map((c) => [c, t(`corner.${c}`)])) },
   { section: 'set.graphics' },
