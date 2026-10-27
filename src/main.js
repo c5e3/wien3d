@@ -284,8 +284,8 @@ const touch = new TouchControls(renderer.domElement, {
   onTwoFingerTap: () => player.active && escape(),
 });
 
-// controller: Start = menu, RB = info, LB / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
-// Back = stats, d-pad left/right = previous/next landmark (A/RT/LT fly up and down, see gamepad.js)
+// controller: Start = menu, RB / A = info, LB / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
+// Back = stats, d-pad left/right = previous/next landmark (RT/LT fly up and down, see gamepad.js)
 const gamepads = new Gamepads(player);
 gamepads.onPress = (b) => {
   if (settings.open) {
@@ -298,7 +298,7 @@ gamepads.onPress = (b) => {
     enterPlay(); // any button
   } else if (player.active) {
     if (b === BTN.START) showMenu();
-    else if (b === BTN.RB) info.click();
+    else if (b === BTN.RB || b === BTN.A) info.click();
     else if (b === BTN.LB || b === BTN.B) info.close();
     else if (b === BTN.Y) player.toggleNoclip();
     else if (b === BTN.UP || b === BTN.DOWN) player.changeSpeed(b === BTN.UP ? 1 : -1);

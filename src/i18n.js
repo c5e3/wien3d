@@ -36,7 +36,7 @@ const STRINGS = {
     'pad.2': '<kbd>{up}</kbd> hoch · <kbd>{down}</kbd> runter · <kbd>{sprint}</kbd> sprinten',
     'pad.1.drone': '<kbd>{thr}</kbd> Schub / gieren · <kbd>{rp}</kbd> nicken / rollen{inv}',
     'pad.2.drone': 'Stick loslassen: Drohne richtet sich waagrecht aus',
-    'pad.3': '<kbd>RB</kbd> Info · <kbd>LB</kbd> schließen · <kbd>Y</kbd> Noclip',
+    'pad.3': '<kbd>RB</kbd>/<kbd>A</kbd> Info · <kbd>LB</kbd>/<kbd>B</kbd> schließen · <kbd>Y</kbd> Noclip',
     'pad.4': '<kbd>▲</kbd><kbd>▼</kbd> Tempo · <kbd>◀</kbd><kbd>▶</kbd> Orte',
     'pad.5': '<kbd>Start</kbd> Menü · <kbd>Back</kbd> Statistik',
     credits:
@@ -215,7 +215,7 @@ const STRINGS = {
     'pad.2': '<kbd>{up}</kbd> up · <kbd>{down}</kbd> down · <kbd>{sprint}</kbd> sprint',
     'pad.1.drone': '<kbd>{thr}</kbd> throttle / yaw · <kbd>{rp}</kbd> pitch / roll{inv}',
     'pad.2.drone': 'Let go of the stick: the drone levels out',
-    'pad.3': '<kbd>RB</kbd> info · <kbd>LB</kbd> close · <kbd>Y</kbd> noclip',
+    'pad.3': '<kbd>RB</kbd>/<kbd>A</kbd> info · <kbd>LB</kbd>/<kbd>B</kbd> close · <kbd>Y</kbd> noclip',
     'pad.4': '<kbd>▲</kbd><kbd>▼</kbd> speed · <kbd>◀</kbd><kbd>▶</kbd> places',
     'pad.5': '<kbd>Start</kbd> menu · <kbd>Back</kbd> stats',
     credits:

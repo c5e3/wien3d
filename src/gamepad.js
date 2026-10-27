@@ -61,7 +61,7 @@ export class Gamepads {
     const s = LOOK * p.lookSens * dt;
     p.look(-Math.sign(rx) * rx * rx * s, -Math.sign(ry) * ry * ry * s);
     const [up, down] = this.swapUpDown ? [BTN.LT, BTN.RT] : [BTN.RT, BTN.LT];
-    p.pad.up = Math.max(btn(BTN.A), trigger(up));
+    p.pad.up = trigger(up);
     p.pad.down = trigger(down);
   }
 }
