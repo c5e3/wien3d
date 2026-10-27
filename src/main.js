@@ -360,8 +360,9 @@ settings.onChange = (k, v) => {
   if (CONTROL_KEYS.includes(k)) refresh();
 };
 
-// screenshot/debug helpers: ?poi=MUSEUMOGD,SEHENSWUERDIGOGD  &info (click after load)
-if (params.get('poi')) pois.ready.then(() => params.get('poi').split(',').forEach((id) => pois.toggle(id, true)));
+// sights are on by default; screenshot/debug helpers: ?poi=MUSEUMOGD,SEHENSWUERDIGOGD (replaces the default)  &info (click after load)
+const startPois = params.get('poi') ?? 'SEHENSWUERDIGOGD';
+pois.ready.then(() => startPois.split(',').forEach((id) => id && pois.toggle(id, true)));
 if (params.has('info')) setTimeout(() => info.click(), 20000);
 if (params.has('panel')) setTimeout(() => pois.show(), 5000);
 window.addEventListener('beforeunload', (e) => {
