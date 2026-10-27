@@ -200,10 +200,10 @@ document.getElementById('settings-close').addEventListener('click', closeSetting
 // privacy notice & imprint: same, opened from the menu's footer link
 const legal = document.getElementById('legal-panel');
 const legalOpen = () => !legal.classList.contains('hidden');
-// contact address, XOR-scrambled so neither the repo nor the bundle holds it as text; it only enters the
-// page while the panel is open, and only becomes a mailto: link on click
-const MAIL = [];
-const mail = () => String.fromCharCode(...MAIL.map((c, i) => c ^ ((i * 7 + 13) & 255)));
+// contact address, from the environment and XOR-scrambled at build time (vite.config.js) so neither the repo
+// nor the bundle holds it as text; it only enters the page while the panel is open, and only becomes a mailto:
+// link on click
+const mail = () => String.fromCharCode(...__IMPRINT__.mail.map((c, i) => c ^ ((i * 7 + 13) & 255)));
 legal.addEventListener('click', (e) => {
   const a = e.target.closest('a.mail');
   if (a) a.href = `mailto:${mail()}`;

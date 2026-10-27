@@ -1,5 +1,8 @@
 // UI strings in German and English (language setting). Content from the city's services, like POI layer
 // titles and field values, stays as published.
+
+// imprint details, injected at build time from the environment (vite.config.js) so they stay out of the repo
+const IMPRINT = __IMPRINT__;
 const STRINGS = {
   de: {
     'menu.sub': 'Open Government Data Wien &amp; Österreich',
@@ -44,10 +47,10 @@ const STRINGS = {
     'legal.title': 'Datenschutz &amp; Impressum',
     'legal.body':
       '<h3>Impressum</h3>' +
-      '<p>Offenlegung gemäß § 25 Mediengesetz<br>Medieninhaber: ***<br>Kontakt: <a class="mail" href="#"></a></p>' +
+      `<p>Offenlegung gemäß § 25 Mediengesetz<br>Medieninhaber: ${IMPRINT.name}, ${IMPRINT.de.town}, ${IMPRINT.de.country}<br>Kontakt: <a class="mail" href="#"></a></p>` +
       '<p>Wien 3D ist ein privates, nicht kommerzielles Hobbyprojekt ohne Werbung und ohne Einnahmen. Inhalt: eine interaktive 3D-Karte von Wien aus offenen Verwaltungsdaten. Für Richtigkeit und Vollständigkeit der dargestellten Daten wird keine Gewähr übernommen.</p>' +
       '<h3>Datenschutz</h3>' +
-      '<p><b>Verantwortlich</b> ist *** (<a class="mail" href="#"></a>).</p>' +
+      `<p><b>Verantwortlich</b> ist ${IMPRINT.name}, ${IMPRINT.de.town} (<a class="mail" href="#"></a>).</p>` +
       '<p>Diese Website verwendet <b>keine Cookies, keine Analyse- oder Tracking-Dienste und keine Werbung</b>. Es gibt keine Benutzerkonten und es werden keine Formulare oder Eingaben an mich übermittelt.</p>' +
       '<p><b>Lokaler Speicher:</b> Deine Einstellungen (z. B. Sprache, Sichtweite) und welche POI-Gruppen aufgeklappt sind, werden nur im lokalen Speicher deines Browsers abgelegt und nie übertragen. Du kannst sie jederzeit löschen, indem du die Websitedaten in deinem Browser entfernst.</p>' +
       '<p><b>Technisch notwendige Verbindungen:</b> Damit die Karte funktioniert, lädt dein Browser Daten direkt von folgenden Servern. Dabei wird, wie bei jedem Webseitenaufruf, deine IP-Adresse an den jeweiligen Anbieter übermittelt:</p>' +
@@ -220,10 +223,10 @@ const STRINGS = {
     'legal.title': 'Privacy notice &amp; imprint',
     'legal.body':
       '<h3>Imprint</h3>' +
-      '<p>Disclosure under § 25 of the Austrian Media Act (Mediengesetz)<br>Media owner: ***<br>Contact: <a class="mail" href="#"></a></p>' +
+      `<p>Disclosure under § 25 of the Austrian Media Act (Mediengesetz)<br>Media owner: ${IMPRINT.name}, ${IMPRINT.en.town}, ${IMPRINT.en.country}<br>Contact: <a class="mail" href="#"></a></p>` +
       '<p>Wien 3D is a private, non-commercial hobby project with no advertising and no revenue. Content: an interactive 3D map of Vienna built from open government data. No guarantee is given for the accuracy or completeness of the data shown.</p>' +
       '<h3>Privacy notice</h3>' +
-      '<p><b>Controller:</b> *** (<a class="mail" href="#"></a>).</p>' +
+      `<p><b>Controller:</b> ${IMPRINT.name}, ${IMPRINT.en.town} (<a class="mail" href="#"></a>).</p>` +
       '<p>This website uses <b>no cookies, no analytics or tracking services and no advertising</b>. There are no user accounts, and no forms or input are sent to me.</p>' +
       '<p><b>Local storage:</b> your settings (e.g. language, render distance) and which POI groups are expanded are kept only in your browser’s local storage and are never transmitted. You can delete them at any time by clearing this site’s data in your browser.</p>' +
       '<p><b>Technically necessary connections:</b> for the map to work, your browser loads data directly from the following servers. As with any website visit, your IP address is transmitted to the respective provider:</p>' +
