@@ -32,13 +32,11 @@ export class TouchControls {
     this.pivot = new THREE.Vector3(); // what twisting rotates the map around
     this.pivotDist = FALLBACK_DIST; // how far ahead along the view the pivot lies
     this.dir = new THREE.Vector3();
-    this.pendingX = 0; // metres to move east (world x) since the last frame, from twisting
-    this.pendingZ = 0; // metres to move in world z since the last frame, from twisting
+    this.pendingTurn = 0; // rad to turn left since the last frame, from twisting
     this.pendingSide = 0; // metres to slide right since the last frame
     this.pendingFwd = 0; // metres to fly forwards on the level since the last frame
     this.pendingUp = 0; // metres to fly up since the last frame
-    this.vx = 0; // m/s in world x
-    this.vz = 0; // m/s in world z
+    this.turnSpeed = 0; // rad/s to the left
     this.sideSpeed = 0; // m/s to the right
     this.fwdSpeed = 0; // m/s forwards on the level
     this.upSpeed = 0; // m/s up
@@ -167,16 +165,9 @@ export class TouchControls {
       return;
     }
 
-    // twisting: turn by the fingers' angle (clockwise on screen turns left, so the map turns along) and circle on
-    // the level around the point the crosshair is on, at the distance it pointed at when the fingers came down
-    if (!da) return;
-    const pos = this.camera.position;
-    this.camera.getWorldDirection(this.pivot).multiplyScalar(this.pivotDist).add(pos);
-    this.player.look(da, 0);
-    const c = Math.cos(da), s = Math.sin(da);
-    const rx = pos.x - this.pivot.x, rz = pos.z - this.pivot.z;
-    this.pendingX += rx * c + rz * s - rx;
-    this.pendingZ += -rx * s + rz * c - rz;
+    // twisting: turn by the fingers' angle (clockwise on screen turns left, so the map turns along); applied
+    // smoothed, once per frame, in update()
+    this.pendingTurn += da;
   }
 
   end(e) {
@@ -196,18 +187,30 @@ export class TouchControls {
     const touching = p.active && this.pts.size > 0;
     if (touching) {
       const a = 1 - Math.exp(-dt * 20), k = 1 / Math.max(dt, 1e-3);
-      this.vx += (this.pendingX * k - this.vx) * a;
-      this.vz += (this.pendingZ * k - this.vz) * a;
+      // softer, like the lift: the fingers' angle is noisy and comes in uneven steps
+      this.turnSpeed += (this.pendingTurn * k - this.turnSpeed) * (1 - Math.exp(-dt * 12));
       this.sideSpeed += (this.pendingSide * k - this.sideSpeed) * a;
       this.fwdSpeed += (this.pendingFwd * k - this.fwdSpeed) * a;
       // a little softer: touch events and frames don't line up, so the per-frame lift comes in uneven steps
       this.upSpeed += (this.pendingUp * k - this.upSpeed) * (1 - Math.exp(-dt * 12));
     }
     // flight follows the fingers directly, and stops the moment they let go
-    p.touchSnap = touching || this.vx !== 0 || this.vz !== 0 || this.sideSpeed !== 0 || this.fwdSpeed !== 0 || this.upSpeed !== 0;
-    if (!touching) this.vx = this.vz = this.sideSpeed = this.fwdSpeed = this.upSpeed = 0;
-    this.pendingX = this.pendingZ = this.pendingSide = this.pendingFwd = this.pendingUp = 0;
-    p.touchVel.set(this.vx, this.upSpeed, this.vz);
+    p.touchSnap = touching || this.turnSpeed !== 0 || this.sideSpeed !== 0 || this.fwdSpeed !== 0 || this.upSpeed !== 0;
+    if (!touching) this.turnSpeed = this.sideSpeed = this.fwdSpeed = this.upSpeed = 0;
+    this.pendingTurn = this.pendingSide = this.pendingFwd = this.pendingUp = 0;
+    p.touchVel.set(0, this.upSpeed, 0);
+    // turning circles on the level around the point the crosshair is on, at the distance it pointed at when the
+    // fingers came down, so the map turns around it; the turn and the orbit come from the same smoothed angle
+    const da = this.turnSpeed * dt;
+    if (da) {
+      const pos = this.camera.position;
+      this.camera.getWorldDirection(this.pivot).multiplyScalar(this.pivotDist).add(pos);
+      p.look(da, 0);
+      const c = Math.cos(da), s = Math.sin(da);
+      const rx = pos.x - this.pivot.x, rz = pos.z - this.pivot.z;
+      p.touchVel.x += (rx * c + rz * s - rx) / dt;
+      p.touchVel.z += (-rx * s + rz * c - rz) / dt;
+    }
     // same directions as D and W in player.js
     p.touchVel.x += Math.cos(p.yaw) * this.sideSpeed - Math.sin(p.yaw) * this.fwdSpeed;
     p.touchVel.z -= Math.sin(p.yaw) * this.sideSpeed + Math.cos(p.yaw) * this.fwdSpeed;
