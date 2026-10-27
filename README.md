@@ -93,6 +93,7 @@ All of this exists because these folks share their data openly:
 | Building footprints, trees, POIs, building info | [Stadt Wien – data.wien.gv.at](https://www.data.gv.at/) (WFS `data.wien.gv.at/daten/geo`) | CC BY 4.0 |
 | Roof model (LOD2.1, CityGML) | [Stadt Wien – MA 41 Stadtvermessung](https://www.wien.gv.at/stadtentwicklung/stadtvermessung/) | CC BY 4.0 |
 | Orthophoto 30 cm | [basemap.at](https://basemap.at/) / Stadt Wien | CC BY 4.0 |
+| Address search | [Stadt Wien – address service](https://www.data.gv.at/) (`data.wien.gv.at/daten/OGDAddressService.svc`) | CC BY 4.0 |
 | Street names | [Stadt Wien – street graph (GIP)](https://www.data.gv.at/) via data.wien.gv.at | CC BY 4.0 |
 | Bridges & tunnels | MA 29, ASFINAG, Wiener Linien via data.wien.gv.at | CC BY 4.0 |
 | Surface model (DOM 5 m, for bridge deck heights) | Stadt Wien | CC BY 4.0 |
