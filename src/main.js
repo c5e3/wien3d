@@ -143,6 +143,10 @@ const resume = (byEsc) => (lastMode === 'mouse' ? enterMouseMode() : enterPlay(b
 const escape = () => (info.open ? info.close() : showMenu());
 
 overlay.addEventListener('click', (e) => {
+  if (e.target.closest('#menu-legal')) {
+    e.preventDefault();
+    return openLegal();
+  }
   if (e.target.closest('a')) return;
   if (e.target.closest('#menu-pois')) return openPois();
   if (e.target.closest('#menu-settings')) return openSettings();
@@ -189,6 +193,29 @@ function closeSettings() {
   showMenu();
 }
 document.getElementById('settings-close').addEventListener('click', closeSettings);
+// privacy notice & imprint: same, opened from the menu's footer link
+const legal = document.getElementById('legal-panel');
+const legalOpen = () => !legal.classList.contains('hidden');
+// contact address, XOR-scrambled so neither the repo nor the bundle holds it as text; it only enters the
+// page while the panel is open, and only becomes a mailto: link on click
+const MAIL = [];
+const mail = () => String.fromCharCode(...MAIL.map((c, i) => c ^ ((i * 7 + 13) & 255)));
+legal.addEventListener('click', (e) => {
+  const a = e.target.closest('a.mail');
+  if (a) a.href = `mailto:${mail()}`;
+});
+function openLegal() {
+  overlay.classList.add('hidden');
+  legal.classList.remove('hidden');
+  for (const a of legal.querySelectorAll('a.mail')) a.textContent = mail();
+  document.getElementById('legal-body').scrollTop = 0;
+}
+function closeLegal() {
+  legal.classList.add('hidden');
+  for (const a of legal.querySelectorAll('a.mail')) (a.textContent = ''), (a.href = '#');
+  showMenu();
+}
+document.getElementById('legal-close').addEventListener('click', closeLegal);
 const toggleStats = () => settings.set('showStats', !settings.get('showStats'));
 document.addEventListener('keydown', (e) => {
   const esc = e.code === 'Escape';
@@ -199,8 +226,10 @@ document.addEventListener('keydown', (e) => {
   }
   if (settings.open) {
     if (esc) closeSettings();
+  } else if (legalOpen()) {
+    if (esc) closeLegal();
   } else if (pois.open) {
-    if (esc || (e.code === 'KeyP' && document.activeElement !== pois.search)) {
+    if (esc ||(e.code === 'KeyP' && document.activeElement !== pois.search)) {
       e.preventDefault();
       closePois(esc);
     }
@@ -256,6 +285,8 @@ const gamepads = new Gamepads(player);
 gamepads.onPress = (b) => {
   if (settings.open) {
     if (b === BTN.B || b === BTN.LT || b === BTN.START) closeSettings();
+  } else if (legalOpen()) {
+    if (b === BTN.B || b === BTN.LT || b === BTN.START) closeLegal();
   } else if (pois.open) {
     if (b === BTN.B || b === BTN.LT || b === BTN.START) closePois();
   } else if (menuOpen() || mouseMode) {

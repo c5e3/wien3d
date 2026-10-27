@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -98,6 +98,14 @@
       #settings-panel h2 { margin: 0; flex: 1; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
       #settings-panel .close { position: static; flex: none; }
       #settings-body { overflow-y: auto; padding-bottom: 4px; accent-color: var(--wien-red); }
+      #legal-panel { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; padding: 16px 18px; }
+      #legal-panel header { display: flex; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--wien-border); }
+      #legal-panel h2 { margin: 0; flex: 1; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+      #legal-panel .close { position: static; flex: none; }
+      #legal-body { overflow-y: auto; line-height: 1.55; }
+      #legal-body h3:first-child { border-top: 0; padding-top: 0; }
+      #legal-body p { margin: 0 0 8px; }
+      #legal-body ul { margin-bottom: 8px; }
       #settings-body h3:first-child { border-top: 0; padding-top: 0; }
       .set-row { display: grid; grid-template-columns: 1fr minmax(110px, 40%); gap: 2px 12px; align-items: center; padding: 6px 0; font-size: 13.5px; }
       .set-row > span { grid-row: span 2; }
@@ -161,6 +169,10 @@
       <header><h2 data-i18n="poi.title"></h2><button id="poi-clear" class="btn" data-i18n="poi.clear"></button><button id="poi-close" class="close" data-i18n-title="close.poi" data-i18n-aria="close">×</button></header>
       <input id="poi-search" type="search" data-i18n-placeholder="poi.search" autocomplete="off" />
       <ul id="poi-list"></ul>
+    </div>
+    <div id="legal-panel" class="card hidden">
+      <header><h2 data-i18n="legal.title"></h2><button id="legal-close" class="close" data-i18n-title="close.settings" data-i18n-aria="close">×</button></header>
+      <div id="legal-body" data-i18n="legal.body"></div>
     </div>
     <div id="overlay">
       <div class="panel">

@@ -2,7 +2,7 @@
   "name": "Wien 3D",
   "short_name": "Wien 3D",
   "description": "A playable 3D map of Vienna built from open government data.",
-  "lang": "de",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
