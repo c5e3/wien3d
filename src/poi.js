@@ -10,7 +10,7 @@ const HOVER = 12; // pin tip height above the highest solid surface below it (m)
 const PIN_PX = 64; // point sprite size; the pin itself fills the upper half (tip = anchor)
 const EDGE = 15; // m: also probe neighbouring chunks this close, for roofs and crowns overhanging a tile border
 
-function pinTexture(color, icon) {
+export function pinTexture(color, icon) {
   const t = new THREE.CanvasTexture(pinCanvas('#' + color.getHexString(), icon));
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -25,8 +25,8 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 const pinScale = (d) => (d > maxDist.value ? 0 : 1 - 0.55 * smooth(150, maxDist.value, d));
 
 // fixed-pixel pins, depth tested (hidden behind buildings), fogged like the map, shrinking with distance
-function pinMaterial(map) {
-  const m = new THREE.PointsMaterial({ size: PIN_PX, sizeAttenuation: false, map, transparent: true, alphaTest: 0.4, fog: true });
+export function pinMaterial(map, size = PIN_PX) {
+  const m = new THREE.PointsMaterial({ size, sizeAttenuation: false, map, transparent: true, alphaTest: 0.4, fog: true });
   m.onBeforeCompile = (s) => {
     s.uniforms.pinMaxDist = maxDist;
     s.vertexShader = 'uniform float pinMaxDist;\n' + s.vertexShader.replace(

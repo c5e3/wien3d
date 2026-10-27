@@ -59,7 +59,9 @@
         padding: 7px 12px; font-size: 12.5px; line-height: 1.5; font-variant-numeric: tabular-nums; }
       #hud:empty { display: none; }
 
-      #compass { width: 88px; height: 88px; border-radius: 50%; box-shadow: var(--wien-shadow-strong); }
+      /* clicking or tapping it opens the address search */
+      #compass { width: 88px; height: 88px; border-radius: 50%; box-shadow: var(--wien-shadow-strong); pointer-events: auto; cursor: pointer; }
+      #compass:hover .c-face { fill: #fff; stroke: var(--wien-red); }
       #compass svg { display: block; width: 100%; height: 100%; overflow: visible; }
       #compass .c-face { fill: #fffffff0; stroke: var(--wien-border-strong); stroke-width: 1; }
       #compass .c-ring { fill: none; stroke: var(--wien-border); stroke-width: .8; }
@@ -159,11 +161,11 @@
       .pad-status.ok { border-left-color: #2f9e44; }
       @media (max-width: 480px) { .set-row { grid-template-columns: 1fr; } .set-row > span { grid-row: auto; } }
       #poi-panel { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); height: min(660px, calc(100vh - 32px)); display: flex; flex-direction: column; padding: 16px 18px; }
-      #poi-panel header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--wien-border); }
-      #poi-panel h2 { margin: 0; flex: 1; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
-      #poi-panel .close { position: static; flex: none; }
-      #poi-search { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1.5px solid #d0d0d0; border-radius: 6px; background: var(--wien-bg); color: var(--wien-text); font: 14px var(--font); }
-      #poi-search:focus { border-color: var(--wien-red); outline: none; }
+      #poi-panel header, #search-panel header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--wien-border); }
+      #poi-panel h2, #search-panel h2 { margin: 0; flex: 1; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+      #poi-panel .close, #search-panel .close { position: static; flex: none; }
+      #poi-search, #addr-search { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1.5px solid #d0d0d0; border-radius: 6px; background: var(--wien-bg); color: var(--wien-text); font: 14px var(--font); }
+      #poi-search:focus, #addr-search:focus { border-color: var(--wien-red); outline: none; }
       #poi-list { list-style: none; margin: 0 -4px; padding: 0 4px; overflow-y: auto; flex: 1; accent-color: var(--wien-red); }
       #poi-list li label { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--wien-radius); cursor: pointer; transition: background .12s; }
       #poi-list li label:hover { background: var(--wien-red-light); }
@@ -181,6 +183,15 @@
       #poi-list .empty { padding: 14px; color: var(--wien-text-muted); }
       #poi-list .ico { width: 22px; height: 22px; flex: none; }
       #poi-list .cnt { margin-left: auto; padding-left: 8px; color: var(--wien-text-muted); font-size: 12px; font-weight: 400; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      /* address search: at the top, clear of the on-screen keyboard */
+      #search-panel { left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); max-height: min(600px, calc(100dvh - 32px)); display: flex; flex-direction: column; padding: 16px 18px; }
+      #addr-list { list-style: none; margin: 0 -4px; padding: 0 4px; overflow-y: auto; flex: 0 1 auto; min-height: 0; }
+      #addr-list li { display: flex; flex-direction: column; padding: 6px 8px; border-left: 3px solid transparent; border-radius: var(--wien-radius); cursor: pointer; }
+      #addr-list li b { font-weight: 600; font-size: 13.5px; }
+      #addr-list li small { color: var(--wien-text-muted); font-size: 11.5px; }
+      #addr-list li:hover { background: var(--wien-bg-alt); }
+      #addr-list li.sel { background: var(--wien-red-light); border-left-color: var(--wien-red); }
+      #addr-list li.empty { padding: 10px 8px; color: var(--wien-text-muted); cursor: default; background: none; border-color: transparent; line-height: 1.5; }
       .btn { border: 1px solid var(--wien-border-strong); border-radius: var(--wien-radius); background: var(--wien-bg); color: var(--wien-text); padding: 5px 11px; font: 500 12.5px var(--font); cursor: pointer; transition: background .12s; }
       .btn:hover { background: var(--wien-bg-alt); }
 
@@ -195,7 +206,7 @@
     <div id="look-ring"></div>
     <div id="aim-label"></div>
     <div id="mouse-mode" class="hidden" data-i18n="mouse.hint"></div>
-    <div id="corner-tl" class="corner tl"><div id="hud" class="hidden"></div><div id="compass" class="hidden" aria-hidden="true"></div></div>
+    <div id="corner-tl" class="corner tl"><div id="hud" class="hidden"></div><div id="compass" class="hidden" data-i18n-title="search.open" data-i18n-aria="search.open"></div></div>
     <div id="corner-tr" class="corner tr"></div>
     <div id="corner-bl" class="corner bl"></div>
     <div id="corner-br" class="corner br"></div>
@@ -211,6 +222,11 @@
       <header><h2 data-i18n="poi.title"></h2><button id="poi-clear" class="btn" data-i18n="poi.clear"></button><button id="poi-close" class="close" data-i18n-title="close.poi" data-i18n-aria="close">×</button></header>
       <input id="poi-search" type="search" data-i18n-placeholder="poi.search" autocomplete="off" />
       <ul id="poi-list"></ul>
+    </div>
+    <div id="search-panel" class="card hidden">
+      <header><h2 data-i18n="search.title"></h2><button id="search-close" class="close" data-i18n-title="close.search" data-i18n-aria="close">×</button></header>
+      <input id="addr-search" type="search" data-i18n-placeholder="search.placeholder" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" />
+      <ul id="addr-list"></ul>
     </div>
     <div id="legal-panel" class="card hidden">
       <header><h2 data-i18n="legal.title"></h2><button id="legal-close" class="close" data-i18n-title="close.settings" data-i18n-aria="close">×</button></header>
@@ -232,6 +248,7 @@
             <li data-i18n="kb.7"></li>
             <li data-i18n="kb.8"></li>
             <li data-i18n="kb.9"></li>
+            <li data-i18n="kb.10"></li>
           </ul></div>
           <div class="touch-only"><h3 data-i18n="menu.touch"></h3><ul>
             <li class="lead" data-i18n="touch.5"></li>
@@ -240,6 +257,7 @@
             <li data-i18n="touch.look"></li>
             <li data-i18n="touch.lift"></li>
             <li data-i18n="touch.rotate"></li>
+            <li data-i18n="touch.compass"></li>
           </ul></div>
           <div><h3 data-i18n="menu.controller"></h3><ul>
             <li data-i18n="pad.1"></li>

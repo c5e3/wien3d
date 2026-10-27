@@ -18,6 +18,7 @@ No API keys, no accounts, no paid map services. Everything comes from **free ope
 - 🪧 **Street names** (optional) floating above the streets and bridges, from the city's street graph
 - ℹ️ **Click on a building** for info like its address, construction period, true height and more
 - 🧭 **Compass** in a corner of your choice (press `K`)
+- 🔎 **Address search / teleport** (press `T`, or click / tap the compass): type an address. Every entrance ("Stiege", e.g. Schiffmühlenstraße 58-64/10) and allotment plot (Parz.) is listed with its own location, and picking one takes you straight above it (top-down, north up, 350 m)
 - 🦅 **Free flight and noclip**, because sometimes you just want to see the Ringstraße from above
 - 🚁 **FPV drone mode** for controllers: throttle, yaw, pitch and roll like a real drone
 - 🇦🇹 **Deutsch or English**, switchable in the settings (it starts in your browser's language)
@@ -42,6 +43,7 @@ Click or tap anywhere, press any key or any controller button, and off you go.
 | `X` or right-click | close the info box |
 | `M` | mouse mode (free cursor, `M` or a click into the scene to continue) |
 | `C` · `K` | coordinates & stats · compass |
+| `T` (or click the compass) | find an address / teleport there |
 | `Esc` | close box / show the start window |
 
 ### Touch 👆
@@ -56,6 +58,7 @@ No on-screen buttons, just gestures:
 | Drag from the circle around the crosshair | look around; the view moves like a photo, so swiping up looks down and swiping left looks right (swipe fast to whip around) |
 | Swipe two fingers up / down | fly straight down / up: the city follows your fingers, so swiping up lowers you |
 | Twist two fingers | rotate the map around whatever the crosshair points at |
+| Tap the compass | find an address / teleport there |
 
 You only move while your fingers do. Prefer steering the crosshair instead of dragging the view? Invert the look left / right and up / down axes separately in **Settings**, and the two-finger up / down as well. The circle around the crosshair can be hidden there too; swiping from inside it keeps working.
 

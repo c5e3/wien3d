@@ -22,11 +22,13 @@ const STRINGS = {
     'kb.7': '<kbd>P</kbd> POI-Liste · <kbd>Klick</kbd> Info · <kbd>X</kbd>/<kbd>Rechtsklick</kbd> Info schließen',
     'kb.8': '<kbd>M</kbd> Mausmodus (freier Zeiger)',
     'kb.9': '<kbd>C</kbd> Koordinaten &amp; Statistik · <kbd>K</kbd> Kompass',
+    'kb.10': '<kbd>T</kbd> Adresse suchen / Teleport',
     'kb.esc': '<kbd>Esc</kbd> Fenster schließen / dieses Fenster anzeigen',
     'touch.1': '<kbd>Ziehen</kbd> Karte verschieben',
     'touch.look': '<kbd>Im Kreis ums Fadenkreuz ansetzen und ziehen</kbd> umsehen (schnell wischen zum Drehen)',
     'touch.lift': '<kbd>2 Finger hoch / runter wischen</kbd> ab- / aufsteigen',
     'touch.rotate': '<kbd>2 Finger drehen</kbd> Karte drehen',
+    'touch.compass': '<kbd>Kompass antippen</kbd> Adresse suchen / Teleport',
     'touch.4': '<kbd>Tippen</kbd> Info zu dem, worauf das Fadenkreuz zeigt; neben die Info tippen schließt sie',
     'touch.5': '<kbd>Mit 2 Fingern tippen</kbd> Info schließen / Menü',
     'pad.1': '<kbd>{move}</kbd> bewegen · <kbd>{look}</kbd> umsehen{inv}',
@@ -38,12 +40,13 @@ const STRINGS = {
     'pad.4': '<kbd>▲</kbd><kbd>▼</kbd> Tempo · <kbd>◀</kbd><kbd>▶</kbd> Orte',
     'pad.5': '<kbd>Start</kbd> Menü · <kbd>Back</kbd> Statistik',
     credits:
-      'Gebäude, Bäume &amp; Straßennamen: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthofoto: basemap.at (CC BY 4.0) · Brücken &amp; Tunnel: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Gelände: DGM Österreich 10 m via AWS Terrain Tiles · Riesenrad-Modell: Lage © OpenStreetMap-Mitwirkende (ODbL), Maße: Wikipedia<br />Quellcode: <a href="https://github.com/c5e3/wien3d" target="_blank" rel="noopener">github.com/c5e3/wien3d</a> (MIT) · <a id="menu-legal" href="#">Datenschutz &amp; Impressum</a>',
+      'Gebäude, Bäume, Adressen &amp; Straßennamen: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthofoto: basemap.at (CC BY 4.0) · Brücken &amp; Tunnel: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Gelände: DGM Österreich 10 m via AWS Terrain Tiles · Riesenrad-Modell: Lage © OpenStreetMap-Mitwirkende (ODbL), Maße: Wikipedia<br />Quellcode: <a href="https://github.com/c5e3/wien3d" target="_blank" rel="noopener">github.com/c5e3/wien3d</a> (MIT) · <a id="menu-legal" href="#">Datenschutz &amp; Impressum</a>',
     'mouse.hint': 'Mausmodus · <kbd>M</kbd> oder Klick in die Szene zum Weiterspielen · <kbd>Esc</kbd> Menü',
     close: 'Schließen',
     'close.info': 'Schließen (X / Esc)',
     'close.settings': 'Schließen (Esc)',
     'close.poi': 'Schließen (P / Esc)',
+    'close.search': 'Schließen (T / Esc)',
     'legal.title': 'Datenschutz &amp; Impressum',
     'legal.body':
       '<h3>Impressum</h3>' +
@@ -56,13 +59,22 @@ const STRINGS = {
       '<p><b>Technisch notwendige Verbindungen:</b> Damit die Karte funktioniert, lädt dein Browser Daten direkt von folgenden Servern. Dabei wird, wie bei jedem Webseitenaufruf, deine IP-Adresse an den jeweiligen Anbieter übermittelt:</p>' +
       '<ul>' +
       '<li><b>Vercel Inc.</b> (USA): Hosting dieser Website. Vercel verarbeitet Zugriffsdaten (IP-Adresse, Zeitpunkt, aufgerufene Datei, Browserkennung) zur Auslieferung und Absicherung des Dienstes.</li>' +
-      '<li><b>Stadt Wien</b> (data.wien.gv.at, mapsneu.wien.gv.at): Gebäude-, Baum- und POI-Daten sowie Orthofotos (basemap.at).</li>' +
+      '<li><b>Stadt Wien</b> (data.wien.gv.at, mapsneu.wien.gv.at): Gebäude-, Baum- und POI-Daten, die Adresssuche (der eingegebene Suchtext) sowie Orthofotos (basemap.at).</li>' +
       '<li><b>Amazon Web Services Inc.</b> (USA, s3.amazonaws.com): Geländehöhen (AWS Terrain Tiles).</li>' +
       '</ul>' +
       '<p>Rechtsgrundlage ist mein berechtigtes Interesse an der Bereitstellung einer funktionierenden Website (Art. 6 Abs. 1 lit. f DSGVO). Die Übermittlung in die USA an Vercel und AWS erfolgt auf Grundlage des EU-US Data Privacy Framework (Art. 45 DSGVO). Ich selbst werte keine Zugriffsdaten aus. Die Anbieter speichern sie nach ihren eigenen Datenschutzbestimmungen nur so lange, wie es für Betrieb und Sicherheit nötig ist.</p>' +
       '<p>Externe Links (z. B. zu GitHub) werden erst geöffnet, wenn du sie anklickst.</p>' +
       '<p><b>Deine Rechte:</b> Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Widerspruch (Art. 15–21 DSGVO). Schreib mir dazu einfach eine E-Mail. Außerdem kannst du dich bei der österreichischen Datenschutzbehörde beschweren (<a href="https://www.dsb.gv.at" target="_blank" rel="noopener">dsb.gv.at</a>).</p>',
 
+    'search.title': 'Adresse suchen / Teleport',
+    'search.open': 'Adresse suchen / Teleport',
+    'search.placeholder': 'Straße Hausnummer, Platz, Park… (z. B. Schiffmühlenstraße 58-64)',
+    'search.hint': 'Stiegen (z. B. 58-64/10) und Parzellen (Parz. 3) haben eigene Standorte und werden einzeln angezeigt.',
+    'search.loading': 'Suche…',
+    'search.none': 'Nichts gefunden.',
+    'search.more': '… und {n} weitere, Hausnummer genauer eingeben',
+    'search.street': 'Straße',
+    'search.error': 'Adresssuche nicht erreichbar ({e})',
     'poi.title': 'Orte &amp; POIs (OGD Wien)',
     'poi.clear': 'Alle aus',
     'poi.search': 'Suchen… (z. B. Museum, Trinkbrunnen, Kunstwerke)',
@@ -202,11 +214,13 @@ const STRINGS = {
     'kb.7': '<kbd>P</kbd> POI list · <kbd>Click</kbd> info · <kbd>X</kbd>/<kbd>Right-click</kbd> close info',
     'kb.8': '<kbd>M</kbd> mouse mode (free cursor)',
     'kb.9': '<kbd>C</kbd> coordinates &amp; stats · <kbd>K</kbd> compass',
+    'kb.10': '<kbd>T</kbd> find an address / teleport',
     'kb.esc': '<kbd>Esc</kbd> close box / show this window',
     'touch.1': '<kbd>Drag</kbd> move the map',
     'touch.look': '<kbd>Drag from the circle around the crosshair</kbd> look around (swipe fast to turn)',
     'touch.lift': '<kbd>2-finger swipe up / down</kbd> fly down / up',
     'touch.rotate': '<kbd>2-finger twist</kbd> rotate the map',
+    'touch.compass': '<kbd>Tap the compass</kbd> find an address / teleport',
     'touch.4': '<kbd>Tap</kbd> info about what the crosshair points at; tap outside the info box to close it',
     'touch.5': '<kbd>2-finger tap</kbd> close info / menu',
     'pad.1': '<kbd>{move}</kbd> move · <kbd>{look}</kbd> look{inv}',
@@ -218,12 +232,13 @@ const STRINGS = {
     'pad.4': '<kbd>▲</kbd><kbd>▼</kbd> speed · <kbd>◀</kbd><kbd>▶</kbd> places',
     'pad.5': '<kbd>Start</kbd> menu · <kbd>Back</kbd> stats',
     credits:
-      'Buildings, trees &amp; street names: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthophoto: basemap.at (CC BY 4.0) · Bridges &amp; tunnels: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Terrain: DGM Österreich 10 m via AWS Terrain Tiles · Riesenrad model: position © OpenStreetMap contributors (ODbL), dimensions: Wikipedia<br />Source code: <a href="https://github.com/c5e3/wien3d" target="_blank" rel="noopener">github.com/c5e3/wien3d</a> (MIT) · <a id="menu-legal" href="#">Privacy notice &amp; imprint</a>',
+      'Buildings, trees, addresses &amp; street names: Stadt Wien – data.wien.gv.at (CC BY 4.0) · Orthophoto: basemap.at (CC BY 4.0) · Bridges &amp; tunnels: MA 29, ASFINAG, Wiener Linien via data.wien.gv.at · DOM 5 m Stadt Wien · Terrain: DGM Österreich 10 m via AWS Terrain Tiles · Riesenrad model: position © OpenStreetMap contributors (ODbL), dimensions: Wikipedia<br />Source code: <a href="https://github.com/c5e3/wien3d" target="_blank" rel="noopener">github.com/c5e3/wien3d</a> (MIT) · <a id="menu-legal" href="#">Privacy notice &amp; imprint</a>',
     'mouse.hint': 'Mouse mode · <kbd>M</kbd> or click into the scene to keep playing · <kbd>Esc</kbd> menu',
     close: 'Close',
     'close.info': 'Close (X / Esc)',
     'close.settings': 'Close (Esc)',
     'close.poi': 'Close (P / Esc)',
+    'close.search': 'Close (T / Esc)',
     'legal.title': 'Privacy notice &amp; imprint',
     'legal.body':
       '<h3>Imprint</h3>' +
@@ -236,13 +251,22 @@ const STRINGS = {
       '<p><b>Technically necessary connections:</b> for the map to work, your browser loads data directly from the following servers. As with any website visit, your IP address is transmitted to the respective provider:</p>' +
       '<ul>' +
       '<li><b>Vercel Inc.</b> (USA): hosting of this website. Vercel processes access data (IP address, time, requested file, browser identifier) to deliver and secure the service.</li>' +
-      '<li><b>City of Vienna</b> (data.wien.gv.at, mapsneu.wien.gv.at): building, tree and POI data as well as orthophotos (basemap.at).</li>' +
+      '<li><b>City of Vienna</b> (data.wien.gv.at, mapsneu.wien.gv.at): building, tree and POI data, the address search (the text you type) as well as orthophotos (basemap.at).</li>' +
       '<li><b>Amazon Web Services Inc.</b> (USA, s3.amazonaws.com): terrain elevation (AWS Terrain Tiles).</li>' +
       '</ul>' +
       '<p>The legal basis is my legitimate interest in providing a working website (Art. 6(1)(f) GDPR). Transfers to Vercel and AWS in the USA are based on the EU-US Data Privacy Framework (Art. 45 GDPR). I do not analyse any access data myself. The providers keep it under their own privacy policies only as long as needed for operation and security.</p>' +
       '<p>External links (e.g. to GitHub) are only opened when you click them.</p>' +
       '<p><b>Your rights:</b> you have the right of access, rectification, erasure, restriction of processing and objection (Art. 15–21 GDPR). Just send me an email. You can also lodge a complaint with the Austrian Data Protection Authority (<a href="https://www.dsb.gv.at" target="_blank" rel="noopener">dsb.gv.at</a>).</p>',
 
+    'search.title': 'Find an address / teleport',
+    'search.open': 'Find an address / teleport',
+    'search.placeholder': 'Street number, square, park… (e.g. Schiffmühlenstraße 58-64)',
+    'search.hint': 'Entrances ("Stiegen", e.g. 58-64/10) and allotment plots (Parz. 3) have their own locations and are listed separately.',
+    'search.loading': 'Searching…',
+    'search.none': 'Nothing found.',
+    'search.more': '… and {n} more, type more of the house number',
+    'search.street': 'Street',
+    'search.error': 'Address search not available ({e})',
     'poi.title': 'Places &amp; POIs (OGD Vienna)',
     'poi.clear': 'All off',
     'poi.search': 'Search… (layer names are German, e.g. Museum, Trinkbrunnen)',

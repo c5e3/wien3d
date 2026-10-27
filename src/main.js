@@ -13,6 +13,7 @@ import { Riesenrad } from './riesenrad.js';
 import { Gamepads, BTN } from './gamepad.js';
 import { Settings, viewDistance } from './settings.js';
 import { Compass } from './compass.js';
+import { AddressSearch } from './search.js';
 import { setLang, setResolver, refresh, tText } from './i18n.js';
 
 const SKY = 0xb8d3ea;
@@ -42,6 +43,7 @@ const streets = new StreetNames({ scene, terrain, player, chunks, renderer });
 const info = new InfoUI({ camera, chunks, pois });
 const riesenrad = new Riesenrad({ scene, terrain });
 info.extra = riesenrad.pickables;
+const search = new AddressSearch({ scene, player, pois });
 
 // ---- landmarks (keys 1-9): name, lat, lon, height above ground, yaw, pitch -------------------
 const PLACES = [
@@ -197,6 +199,28 @@ function closeSettings() {
   showMenu();
 }
 document.getElementById('settings-close').addEventListener('click', closeSettings);
+// address search / teleport: click or tap the compass, or T (keyboard); picking an address flies there and carries on in the last mode
+function openSearch() {
+  leavePlay();
+  setMouseMode(false);
+  overlay.classList.add('hidden');
+  search.show();
+}
+// Esc goes back to playing without taking the pointer lock (the browser drops a lock taken around an Esc
+// keypress, which would bring up the menu); the next click takes it
+function closeSearch(byEsc = false) {
+  search.hide();
+  if (byEsc && lastMode === 'play') player.setSoft(true);
+  else resume();
+}
+// a click or tap next to the search window closes it and plays on; the click lets the browser lock the pointer
+function closeSearchOutside() {
+  search.hide();
+  enterPlay();
+}
+compass.el.addEventListener('click', () => (search.open ? closeSearch() : openSearch()));
+document.getElementById('search-close').addEventListener('click', () => closeSearch());
+search.onPick = () => closeSearch();
 // privacy notice & imprint: same, opened from the menu's footer link
 const legal = document.getElementById('legal-panel');
 const legalOpen = () => !legal.classList.contains('hidden');
@@ -233,6 +257,11 @@ document.addEventListener('keydown', (e) => {
     if (esc) closeSettings();
   } else if (legalOpen()) {
     if (esc) closeLegal();
+  } else if (search.open) {
+    if (esc || (e.code === 'KeyT' && document.activeElement !== search.input)) {
+      e.preventDefault();
+      closeSearch(esc);
+    }
   } else if (pois.open) {
     if (esc ||(e.code === 'KeyP' && document.activeElement !== pois.search)) {
       e.preventDefault();
@@ -253,6 +282,9 @@ document.addEventListener('keydown', (e) => {
     else if (e.code === 'KeyP') {
       e.preventDefault(); // or the "p" lands in the search field that show() focuses
       openPois();
+    } else if (e.code === 'KeyT') {
+      e.preventDefault(); // or the "t" lands in the search field that show() focuses
+      openSearch();
     } else if (e.code === 'KeyM') enterMouseMode();
     else if (e.code === 'KeyX') info.close();
     else if (e.code === 'KeyC') toggleStats();
@@ -260,13 +292,21 @@ document.addEventListener('keydown', (e) => {
   } else if (mouseMode) {
     if (esc) escape();
     else if (e.code === 'KeyM') enterPlay();
-    else if (e.code === 'KeyX') info.close();
+    else if (e.code === 'KeyT') {
+      e.preventDefault();
+      openSearch();
+    } else if (e.code === 'KeyX') info.close();
     else if (e.code === 'KeyC') toggleStats();
     else if (e.code === 'KeyK') toggleCompass();
   }
 });
 document.addEventListener('mousedown', (e) => {
   if (touchUi) return; // taps on panels; the scene itself is handled by TouchControls
+  if (e.target.closest('#compass')) return; // opens the address search
+  if (search.open) {
+    if (e.button === 0 && !e.target.closest('#search-panel')) closeSearchOutside();
+    return;
+  }
   if (e.button === 2) {
     if (player.active || mouseMode) info.close();
   } else if (e.button === 0) {
@@ -282,7 +322,7 @@ const touch = new TouchControls(renderer.domElement, {
   player,
   camera,
   aimDistance: () => info.aimDistance(),
-  onTap: () => player.active && (info.open ? info.close() : info.click()),
+  onTap: () => (search.open ? closeSearchOutside() : player.active && (info.open ? info.close() : info.click())),
   onTwoFingerTap: () => player.active && escape(),
 });
 
@@ -294,6 +334,8 @@ gamepads.onPress = (b) => {
     if (b === BTN.B || b === BTN.LB || b === BTN.START) closeSettings();
   } else if (legalOpen()) {
     if (b === BTN.B || b === BTN.LB || b === BTN.START) closeLegal();
+  } else if (search.open) {
+    if (b === BTN.B || b === BTN.LB || b === BTN.START) closeSearch();
   } else if (pois.open) {
     if (b === BTN.B || b === BTN.LB || b === BTN.START) closePois();
   } else if (menuOpen() || mouseMode) {
@@ -414,6 +456,7 @@ function frame(now) {
   chunks.update(player.pos);
   riesenrad.update(dt);
   pois.update(dt);
+  search.update(dt);
   streets.update(dt, camera);
   info.update(dt, player.active || shot);
   updateHud(now);
@@ -423,4 +466,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__wien = { player, chunks, terrain, camera, pois, streets, info, riesenrad };
+window.__wien = { player, chunks, terrain, camera, pois, streets, info, riesenrad, search };
