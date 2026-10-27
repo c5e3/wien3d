@@ -1,3 +1,4 @@
+import { unzlibSync } from 'fflate';
 import { worldToTile } from './geo.js';
 
 // Terrarium-encoded elevation tiles (AWS Open Data "Terrain Tiles").
@@ -5,6 +6,58 @@ import { worldToTile } from './geo.js';
 const TZ = 14;
 const URL = (x, y) => `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${TZ}/${x}/${y}.png`;
 const FALLBACK_HEIGHT = 170;
+
+/**
+ * Minimal PNG decoder for the 8-bit, non-interlaced RGB(A) terrarium tiles -> RGB bytes. Decoding through a
+ * canvas is not an option: Safari's fingerprinting protection adds noise to getImageData, and since the red
+ * channel carries height * 256 that turns the terrain into spikes.
+ */
+function decodePng(png) {
+  const dv = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  const idat = [];
+  let w = 0, h = 0, ch = 0;
+  for (let o = 8; o + 8 <= png.length; ) {
+    const len = dv.getUint32(o), type = String.fromCharCode(...png.subarray(o + 4, o + 8));
+    if (type === 'IHDR') {
+      w = dv.getUint32(o + 8);
+      h = dv.getUint32(o + 12);
+      const depth = png[o + 16], color = png[o + 17], interlace = png[o + 20];
+      ch = color === 2 ? 3 : color === 6 ? 4 : 0;
+      if (depth !== 8 || !ch || interlace) throw new Error(`unsupported png (depth ${depth}, color ${color}, interlace ${interlace})`);
+    } else if (type === 'IDAT') idat.push(png.subarray(o + 8, o + 8 + len));
+    else if (type === 'IEND') break;
+    o += 12 + len;
+  }
+  if (w !== 256 || h !== 256) throw new Error(`unexpected png size ${w}x${h}`);
+  let n = 0;
+  for (const d of idat) n += d.length;
+  const z = new Uint8Array(n);
+  n = 0;
+  for (const d of idat) z.set(d, n), (n += d.length);
+  const raw = unzlibSync(z);
+  // undo the per-scanline filters
+  const stride = w * ch, img = new Uint8Array(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, dst = y * stride;
+    for (let i = 0; i < stride; i++) {
+      const a = i >= ch ? img[dst + i - ch] : 0, b = y ? img[dst + i - stride] : 0, c = i >= ch && y ? img[dst + i - ch - stride] : 0;
+      let p;
+      if (f === 0) p = 0;
+      else if (f === 1) p = a;
+      else if (f === 2) p = b;
+      else if (f === 3) p = (a + b) >> 1;
+      else {
+        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+        p = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      img[dst + i] = raw[src + i] + p;
+    }
+  }
+  if (ch === 3) return img;
+  const rgb = new Uint8Array(w * h * 3);
+  for (let i = 0, j = 0; i < img.length; i += 4, j += 3) (rgb[j] = img[i]), (rgb[j + 1] = img[i + 1]), (rgb[j + 2] = img[i + 2]);
+  return rgb;
+}
 
 export class Terrain {
   constructor() {
@@ -19,17 +72,13 @@ export class Terrain {
     entry.promise = fetch(URL(tx, ty))
       .then((r) => {
         if (!r.ok) throw new Error(`terrain ${r.status}`);
-        return r.blob();
+        return r.arrayBuffer();
       })
-      .then((b) => createImageBitmap(b, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }))
-      .then((bmp) => {
-        const c = new OffscreenCanvas(256, 256);
-        const ctx = c.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(bmp, 0, 0);
-        const px = ctx.getImageData(0, 0, 256, 256).data;
+      .then((buf) => {
+        const px = decodePng(new Uint8Array(buf));
         const data = new Float32Array(256 * 256);
         for (let i = 0; i < data.length; i++) {
-          data[i] = px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768;
+          data[i] = px[i * 3] * 256 + px[i * 3 + 1] + px[i * 3 + 2] / 256 - 32768;
         }
         entry.data = data;
       })
