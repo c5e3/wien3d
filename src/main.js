@@ -36,7 +36,7 @@ const collision = new Collision();
 const chunks = new ChunkManager({ scene, terrain, collision, renderer });
 const player = new Player(camera, renderer.domElement, terrain, collision);
 const pois = new PoiManager({ scene, terrain, player, chunks });
-const info = new InfoUI({ camera, chunks, pois, terrain });
+const info = new InfoUI({ camera, chunks, pois });
 const riesenrad = new Riesenrad({ scene, terrain });
 info.extra = riesenrad.pickables;
 

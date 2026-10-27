@@ -35,6 +35,13 @@ async function wfs(type, lon, lat, d) {
   return (await r.json()).features || [];
 }
 
+/** All FMZK parts of one building (tower, nave, annexes, ...), however far they reach beyond the pick bbox. */
+async function buildingParts(gebId) {
+  const r = await fetch(`${WFS}&typeName=ogdwien:FMZKBKMOGD&CQL_FILTER=BW_GEB_ID=${Number(gebId)}`);
+  const fs = (await r.json()).features || [];
+  return fs.length ? fs : null;
+}
+
 function inPoly(coords, lon, lat) {
   const polys = coords.length && typeof coords[0][0][0] === 'number' ? [coords] : coords;
   for (const poly of polys) {
@@ -86,8 +93,13 @@ async function buildingHtml(point) {
   const acd = per?.ACD;
   const gi = (acd && info.find((f) => f.properties.ACD === acd)) || near(info, 35)[0]?.f;
   const g = gi?.properties || {};
-  const height = parts.length ? Math.max(...parts.map((f) => f.properties.O_KOTE - f.properties.T_KOTE).filter(Number.isFinite)) : null;
-  const ground = parts.length ? Math.min(...parts.map((f) => f.properties.T_KOTE).filter(Number.isFinite)) : null;
+  // the parts under the crosshair only say which building it is; its height comes from all of its parts
+  const gebId = parts.find((f) => f.properties.BW_GEB_ID != null)?.properties.BW_GEB_ID;
+  const whole = (gebId != null && (await buildingParts(gebId).catch(() => null))) || parts;
+  const tops = whole.map((f) => f.properties.O_KOTE).filter(Number.isFinite);
+  const grounds = whole.map((f) => f.properties.T_KOTE).filter(Number.isFinite);
+  const ground = grounds.length ? Math.min(...grounds) : null;
+  const height = tops.length && ground !== null ? Math.max(...tops) - ground : null;
   const addr = g.STRNAML ? `${g.STRNAML} ${g.VONN ?? ''}${g.VONA ?? ''}${g.BISN ? '–' + g.BISN : ''}, ${tText('info.district', { n: Number(g.BEZ) || '' })}` : null;
 
   let html = `<h2>${esc(g.HA_NAME || tText('building'))}</h2>`;
@@ -148,8 +160,7 @@ function riesenradHtml() {
   );
 }
 
-function structureHtml(s, point, terrain) {
-  const g = terrain.heightAt(point.x, point.z);
+function structureHtml(s) {
   return (
     `<h2>${esc(s.name || tText(s.kind === 't' ? 'tunnel' : 'bridge'))}</h2>` +
     rows([
@@ -157,17 +168,15 @@ function structureHtml(s, point, terrain) {
       [tText('f.operator'), s.op],
       [tText('f.objectNo'), s.id],
       [tText('f.length'), s.len ? `${s.len} m` : null],
-      [tText(s.kind === 't' ? 'f.aboveTerrain' : 'f.aboveGround'), g !== null ? `${(point.y - g).toFixed(1)} m` : null],
     ])
   );
 }
 
 export class InfoUI {
-  constructor({ camera, chunks, pois, terrain }) {
+  constructor({ camera, chunks, pois }) {
     this.camera = camera;
     this.chunks = chunks;
     this.pois = pois;
-    this.terrain = terrain;
     this.extra = []; // pickable models outside the chunks (Riesenrad)
     this.ray = new THREE.Raycaster();
     this.ray.far = PICK_RANGE;
@@ -226,7 +235,7 @@ export class InfoUI {
     }
     if (kind === 'structure') {
       const s = structureAt(hit.point.x, hit.point.z);
-      return { kind, label: s?.name || tText('bridge'), s, point: hit.point.clone() };
+      return { kind, label: s?.name || tText('bridge'), s };
     }
     return { kind: 'building', label: tText('building'), point: insidePoint(hit, this.ray.ray.direction) };
   }
@@ -252,7 +261,7 @@ export class InfoUI {
     } else if (hit.kind === 'tree') {
       this.body.innerHTML = `<div class="kicker">${t('info.trees')}</div>` + treeHtml(hit.props);
     } else if (hit.kind === 'structure') {
-      this.body.innerHTML = `<div class="kicker">${t('info.structures')}</div>` + (hit.s ? structureHtml(hit.s, hit.point, this.terrain) : `<h2>${t('bridge')}</h2>`);
+      this.body.innerHTML = `<div class="kicker">${t('info.structures')}</div>` + (hit.s ? structureHtml(hit.s) : `<h2>${t('bridge')}</h2>`);
     } else {
       this.body.innerHTML = `<div class="kicker">${t('building')}</div><p class="muted">${t('info.loading')}</p>`;
       try {
