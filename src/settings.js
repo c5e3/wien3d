@@ -18,6 +18,8 @@ export const DEFAULTS = {
   touchDragView: false,
   touchPinchToApproach: false,
   showStats: false,
+  showCompass: true,
+  compassCorner: 'tl', // tl / tr / bl / br
 };
 
 const km = (m) =>
@@ -27,6 +29,11 @@ export const viewDistance = (range) => (range + 3) * CHUNK_M * 1.065; // fog end
 // rendered top to bottom; label / hint / section are i18n keys
 const SCHEMA = [
   { key: 'lang', label: 'set.lang', type: 'select', options: LANGS },
+  { section: 'set.display' },
+  { key: 'showStats', label: 'set.showStats', type: 'check' },
+  { key: 'showCompass', label: 'set.showCompass', type: 'check' },
+  { key: 'compassCorner', label: 'set.compassCorner', type: 'select',
+    options: () => Object.fromEntries(['tl', 'tr', 'bl', 'br'].map((c) => [c, t(`corner.${c}`)])) },
   { section: 'set.graphics' },
   { key: 'range', label: 'set.range', type: 'range', min: 1, max: 7, step: 1,
     fmt: (v) => t('set.range.fmt', { a: km((v + 0.5) * CHUNK_M), b: km(viewDistance(v)) }), hint: 'set.range.hint' },
@@ -45,8 +52,6 @@ const SCHEMA = [
   { section: 'set.touch' },
   { key: 'touchDragView', label: 'set.touchDragView', type: 'check', hint: 'set.touchDragView.hint' },
   { key: 'touchPinchToApproach', label: 'set.touchPinch', type: 'check', hint: 'set.touchPinch.hint' },
-  { section: 'set.display' },
-  { key: 'showStats', label: 'set.showStats', type: 'check' },
 ];
 
 function load() {
@@ -117,7 +122,7 @@ export class Settings {
       if (r.type === 'check')
         return `<label class="set-row check"><input type="checkbox" data-key="${r.key}"${v ? ' checked' : ''} /><span>${label}${hint}</span></label>`;
       if (r.type === 'select')
-        return `<label class="set-row"><span>${label}</span><select data-key="${r.key}">${Object.entries(r.options)
+        return `<label class="set-row"><span>${label}</span><select data-key="${r.key}">${Object.entries(typeof r.options === 'function' ? r.options() : r.options)
           .map(([k, name]) => `<option value="${k}"${k === v ? ' selected' : ''}>${name}</option>`)
           .join('')}</select></label>`;
       return `<label class="set-row"><span>${label}${hint}</span>

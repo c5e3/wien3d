@@ -40,10 +40,35 @@
         background: #ffffff80; border: 1px solid #d4d4d480; border-radius: var(--wien-radius); box-shadow: var(--wien-shadow); padding: 3px 9px; font-size: 13px; font-weight: 600; }
       #aim-label:empty { display: none; }
 
+      /* screen corners stack the status box and the compass (compass.js moves it to the chosen corner) */
+      .corner { position: fixed; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+      .corner.tl, .corner.tr { top: max(12px, env(safe-area-inset-top)); }
+      .corner.bl, .corner.br { bottom: max(12px, env(safe-area-inset-bottom)); }
+      .corner.tl, .corner.bl { left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
+      .corner.tr, .corner.br { right: max(12px, env(safe-area-inset-right)); align-items: flex-end; }
+
       /* status box, like the map's state panel */
-      #hud { position: fixed; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); pointer-events: none; background: #fffffff0; border: 1px solid var(--wien-border); border-left: 4px solid var(--wien-red); border-radius: var(--wien-radius); box-shadow: var(--wien-shadow);
+      #hud { pointer-events: none; background: #fffffff0; border: 1px solid var(--wien-border); border-left: 4px solid var(--wien-red); border-radius: var(--wien-radius); box-shadow: var(--wien-shadow);
         padding: 7px 12px; font-size: 12.5px; line-height: 1.5; font-variant-numeric: tabular-nums; }
       #hud:empty { display: none; }
+
+      #compass { width: 88px; height: 88px; border-radius: 50%; box-shadow: var(--wien-shadow-strong); }
+      #compass svg { display: block; width: 100%; height: 100%; overflow: visible; }
+      #compass .c-face { fill: #fffffff0; stroke: var(--wien-border-strong); stroke-width: 1; }
+      #compass .c-ring { fill: none; stroke: var(--wien-border); stroke-width: .8; }
+      #compass .c-tick { stroke: var(--wien-border-strong); stroke-width: 1; stroke-linecap: round; }
+      #compass .c-tick.major { stroke: var(--wien-text-muted); }
+      #compass .c-tick.cardinal { stroke: var(--wien-text); stroke-width: 1.6; }
+      #compass .c-tick.north { stroke: var(--wien-red); stroke-width: 2.2; }
+      #compass .n1 { fill: var(--wien-red); }
+      #compass .n2 { fill: var(--wien-red-dark); }
+      #compass .s1 { fill: var(--wien-border); }
+      #compass .s2 { fill: var(--wien-border-strong); }
+      #compass .c-pivot { fill: var(--wien-bg); stroke: var(--wien-text); stroke-width: 1.2; }
+      #compass .c-dir { fill: var(--wien-text); font: 700 12px var(--font); text-anchor: middle; dominant-baseline: central; }
+      #compass .c-dir.north { fill: var(--wien-red); font-size: 13.5px; }
+      #compass .c-mark { fill: var(--wien-red); }
+      @media (max-width: 600px), (max-height: 500px) { #compass { width: 68px; height: 68px; } }
 
       kbd, .cols b { display: inline-block; min-width: 18px; padding: 0 6px; margin-right: 6px; border: 1px solid var(--wien-border-strong); border-bottom-width: 2px; border-radius: var(--wien-radius); background: var(--wien-bg-alt); color: var(--wien-text);
         text-align: center; font: 600 11.5px/19px var(--font); }
@@ -156,7 +181,10 @@
     <div id="crosshair"></div>
     <div id="aim-label"></div>
     <div id="mouse-mode" class="hidden" data-i18n="mouse.hint"></div>
-    <div id="hud" class="hidden"></div>
+    <div id="corner-tl" class="corner tl"><div id="hud" class="hidden"></div><div id="compass" class="hidden" aria-hidden="true"></div></div>
+    <div id="corner-tr" class="corner tr"></div>
+    <div id="corner-bl" class="corner bl"></div>
+    <div id="corner-br" class="corner br"></div>
     <div id="info-panel" class="card hidden">
       <button id="info-close" class="close" data-i18n-title="close.info" data-i18n-aria="close">×</button>
       <div id="info-body"></div>

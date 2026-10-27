@@ -11,6 +11,7 @@ import { TouchControls } from './touch.js';
 import { Riesenrad } from './riesenrad.js';
 import { Gamepads, BTN } from './gamepad.js';
 import { Settings, viewDistance } from './settings.js';
+import { Compass } from './compass.js';
 import { setLang, setResolver, refresh, tText } from './i18n.js';
 
 const SKY = 0xb8d3ea;
@@ -75,6 +76,7 @@ else goTo(0);
 // ---- UI -----------------------------------------------------------------------------------
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
+const compass = new Compass(document.getElementById('compass'));
 const params = new URLSearchParams(location.search);
 const shot = params.has('shot');
 if (shot) overlay.classList.add('hidden');
@@ -217,6 +219,7 @@ function closeLegal() {
 }
 document.getElementById('legal-close').addEventListener('click', closeLegal);
 const toggleStats = () => settings.set('showStats', !settings.get('showStats'));
+const toggleCompass = () => settings.set('showCompass', !settings.get('showCompass'));
 document.addEventListener('keydown', (e) => {
   const esc = e.code === 'Escape';
   if (esc) {
@@ -251,11 +254,13 @@ document.addEventListener('keydown', (e) => {
     } else if (e.code === 'KeyM') enterMouseMode();
     else if (e.code === 'KeyX') info.close();
     else if (e.code === 'KeyC') toggleStats();
+    else if (e.code === 'KeyK') toggleCompass();
   } else if (mouseMode) {
     if (esc) escape();
     else if (e.code === 'KeyM') enterPlay();
     else if (e.code === 'KeyX') info.close();
     else if (e.code === 'KeyC') toggleStats();
+    else if (e.code === 'KeyK') toggleCompass();
   }
 });
 document.addEventListener('mousedown', (e) => {
@@ -328,6 +333,8 @@ function applySetting(k, v) {
   else if (k === 'padDrone') gamepads.drone = v;
   else if (k === 'touchPinchToApproach') touch.pinchToApproach = v;
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
+  else if (k === 'showCompass') compass.setVisible(v);
+  else if (k === 'compassCorner') compass.setCorner(v);
 }
 // the menu's control lists show the inputs as currently set up
 const CONTROL_KEYS = ['padSwapSticks', 'padInvertY', 'padSwapUpDown', 'padDrone', 'touchDragView', 'touchPinchToApproach'];
@@ -405,6 +412,7 @@ function frame(now) {
   pois.update(dt);
   info.update(dt, player.active || shot);
   updateHud(now);
+  compass.update(player.yaw);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
