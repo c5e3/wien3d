@@ -282,8 +282,9 @@ const touch = new TouchControls(renderer.domElement, {
   player,
   camera,
   aimDistance: () => info.aimDistance(),
-  onTap: () => player.active && info.click(),
+  onDoubleTap: () => player.active && info.click(),
   onTwoFingerTap: () => player.active && escape(),
+  onThreeFingerTap: () => player.active && openPois(),
 });
 
 // controller: Start = menu, RB / A = info, LB / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
@@ -332,9 +333,9 @@ function applySetting(k, v) {
   else if (k === 'padInvertY') gamepads.invertY = v;
   else if (k === 'padSwapUpDown') gamepads.swapUpDown = v;
   else if (k === 'padSwapSticks') gamepads.swapSticks = v;
-  else if (k === 'touchDragView') touch.dragView = v;
+  else if (k === 'touchInvertX') touch.invertX = v;
+  else if (k === 'touchInvertY') touch.invertY = v;
   else if (k === 'padDrone') gamepads.drone = v;
-  else if (k === 'touchPinchToApproach') touch.pinchToApproach = v;
   else if (k === 'showStats') hud.classList.toggle('hidden', !v);
   else if (k === 'showCompass') compass.setVisible(v);
   else if (k === 'showStreetNames') streets.setVisible(v);
@@ -342,13 +343,9 @@ function applySetting(k, v) {
   else if (k === 'compassCorner') compass.setCorner(v);
 }
 // the menu's control lists show the inputs as currently set up
-const CONTROL_KEYS = ['padSwapSticks', 'padInvertY', 'padSwapUpDown', 'padDrone', 'touchDragView', 'touchPinchToApproach'];
+const CONTROL_KEYS = ['padSwapSticks', 'padInvertY', 'padSwapUpDown', 'padDrone'];
 function controlText(key) {
   const s = settings.values;
-  if (key === 'touch.1' && s.touchDragView) return ['touch.1.view'];
-  if (key === 'touch.fwd' && s.touchDragView) return ['touch.fwd.view'];
-  if (key === 'touch.2' && s.touchPinchToApproach) return ['touch.2.pinch'];
-  if (key === 'touch.3' && s.touchPinchToApproach) return ['touch.3.spread'];
   if (key === 'pad.1' && s.padDrone)
     return ['pad.1.drone', { thr: s.padSwapSticks ? 'R' : 'L', rp: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
   if (key === 'pad.2' && s.padDrone) return ['pad.2.drone'];

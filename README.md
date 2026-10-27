@@ -14,11 +14,14 @@ No API keys, no accounts, no paid map services. Everything comes from **free ope
 - 🌉 **Bridges & tunnels** at their real heights
 - 🌳 **Trees** from the city's tree register
 - 🎡 **The Riesenrad**, built to scale and slowly turning (one lap takes about 4¼ minutes, just like the real one)
-- 📍 **Hundreds of POI layers** (press `P`): drinking fountains, museums, public art, toilets, playgrounds, Würstelstände-adjacent things… toggle whatever you like
-- ℹ️ **Click on a building** for info like its address, construction period and more
+- 📍 **Hundreds of POI layers** (press `P`): drinking fountains, museums, public art, toilets, playgrounds, Würstelstände-adjacent things… toggle whatever you like (the city's sights are on from the start)
+- 🪧 **Street names** (optional) floating above the streets and bridges, from the city's street graph
+- ℹ️ **Click on a building** for info like its address, construction period, true height and more
+- 🧭 **Compass** in a corner of your choice (press `K`)
 - 🦅 **Free flight and noclip**, because sometimes you just want to see the Ringstraße from above
+- 🚁 **FPV drone mode** for controllers: throttle, yaw, pitch and roll like a real drone
 - 🇦🇹 **Deutsch or English**, switchable in the settings (it starts in your browser's language)
-- ⚙️ **Settings** for render distance, resolution, field of view, speed, look sensitivity and controller/touch preferences, remembered in your browser
+- ⚙️ **Settings** for render distance, resolution, field of view, speed, look sensitivity, display (stats, compass, street names) and controller/touch preferences, remembered in your browser
 
 ## Controls
 
@@ -38,7 +41,7 @@ Click or tap anywhere, press any key or any controller button, and off you go.
 | Click | info about what the crosshair points at |
 | `X` or right-click | close the info box |
 | `M` | mouse mode (free cursor, `M` or a click into the scene to continue) |
-| `C` | coordinates & stats |
+| `C` · `K` | coordinates & stats · compass |
 | `Esc` | close box / show the start window |
 
 ### Touch 👆
@@ -47,15 +50,14 @@ No on-screen buttons, just gestures:
 
 | Gesture | What it does |
 | --- | --- |
-| Drag one finger | move the crosshair like on a trackpad (swipe fast to whip around) |
-| Pinch (fingers together) | fly towards whatever the crosshair points at |
-| Spread (fingers apart) | back away |
-| Two fingers left / right | slide sideways (works while pinching, too) |
-| Two fingers up / down | fly forwards / backwards on the level, just like `W` / `S` (pinching flies along the view instead) |
-| Tap | info about what the crosshair points at |
+| Drag one finger | move the map: the city follows your finger, sideways and forwards / backwards on the level |
+| Drag two fingers | look around; the view moves like a photo, so swiping up looks down and swiping left looks right (swipe fast to whip around) |
+| Twist two fingers | rotate the map around whatever the crosshair points at |
+| Double-tap | info about what the crosshair points at |
 | Two-finger tap | close the info box / open the menu |
+| Three-finger tap | POI browser |
 
-Pinching covers a share of the distance to the target, so far things come quickly and close things gently. You only move while your fingers do. Prefer it the other way round? Flip the drag, pinch and two-finger up / down directions in **Settings**.
+You only move while your fingers do. Prefer steering the crosshair instead of dragging the view? Invert the two-finger left / right and up / down axes separately in **Settings**.
 
 ### Controller 🎮
 
@@ -71,7 +73,7 @@ Pinching covers a share of the distance to the target, so far things come quickl
 | D-pad ◀ ▶ | previous / next landmark |
 | `Start` · `Back` | menu · stats |
 
-Bluetooth controllers need no extra step: pair it with your phone, tablet or PC as usual, press any button, and you're in. **Settings** shows whether it was found and lets you invert the look axis, swap fly up / down or swap the sticks.
+Bluetooth controllers need no extra step: pair it with your phone, tablet or PC as usual, press any button, and you're in. **Settings** shows whether it was found and lets you invert the look axis, swap fly up / down, swap the sticks or switch to **FPV drone controls** (left stick: throttle, centre holds the height, and yaw; right stick: pitch and roll; let go and the drone levels out).
 
 ### Install as an app 📲
 
@@ -88,6 +90,7 @@ All of this exists because these folks share their data openly:
 | Building footprints, trees, POIs, building info | [Stadt Wien – data.wien.gv.at](https://www.data.gv.at/) (WFS `data.wien.gv.at/daten/geo`) | CC BY 4.0 |
 | Roof model (LOD2.1, CityGML) | [Stadt Wien – MA 41 Stadtvermessung](https://www.wien.gv.at/stadtentwicklung/stadtvermessung/) | CC BY 4.0 |
 | Orthophoto 30 cm | [basemap.at](https://basemap.at/) / Stadt Wien | CC BY 4.0 |
+| Street names | [Stadt Wien – street graph (GIP)](https://www.data.gv.at/) via data.wien.gv.at | CC BY 4.0 |
 | Bridges & tunnels | MA 29, ASFINAG, Wiener Linien via data.wien.gv.at | CC BY 4.0 |
 | Surface model (DOM 5 m, for bridge deck heights) | Stadt Wien | CC BY 4.0 |
 | Terrain | DGM Österreich 10 m via [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | open data |

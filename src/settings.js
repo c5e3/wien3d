@@ -15,8 +15,8 @@ export const DEFAULTS = {
   padSwapUpDown: false,
   padSwapSticks: false,
   padDrone: false,
-  touchDragView: false,
-  touchPinchToApproach: false,
+  touchInvertX: false,
+  touchInvertY: false,
   showStats: false,
   showCompass: true,
   showStreetNames: false,
@@ -55,8 +55,8 @@ const SCHEMA = [
   { key: 'padSwapSticks', label: 'set.padSwapSticks', type: 'check' },
   { key: 'padDrone', label: 'set.padDrone', type: 'check', hint: 'set.padDrone.hint' },
   { section: 'set.touch' },
-  { key: 'touchDragView', label: 'set.touchDragView', type: 'check', hint: 'set.touchDragView.hint' },
-  { key: 'touchPinchToApproach', label: 'set.touchPinch', type: 'check', hint: 'set.touchPinch.hint' },
+  { key: 'touchInvertX', label: 'set.touchInvertX', type: 'check' },
+  { key: 'touchInvertY', label: 'set.touchInvertY', type: 'check', hint: 'set.touchInvert.hint' },
 ];
 
 function load() {

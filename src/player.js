@@ -36,8 +36,8 @@ export class Player {
     this.drone = new Drone();
     this.droneOn = false; // gamepad.js: FPV drone controls with a controller connected
     this.droneWas = false;
-    this.touchVel = new THREE.Vector3(); // flight from pinch gestures, see touch.js
-    this.touchSnap = false; // touch.js: velocity follows touchVel without easing (no drift after a pinch)
+    this.touchVel = new THREE.Vector3(); // flight from touch gestures, see touch.js
+    this.touchSnap = false; // touch.js: velocity follows touchVel without easing (no drift after a gesture)
     this.baseFov = camera.fov;
     this.lastW = 0;
     this.locked = false;
