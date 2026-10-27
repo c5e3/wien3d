@@ -20,6 +20,7 @@ export const DEFAULTS = {
   showStats: false,
   showCompass: true,
   showStreetNames: false,
+  streetNamesHeight: 1, // m above the terrain
   compassCorner: 'tl', // tl / tr / bl / br
 };
 
@@ -33,9 +34,11 @@ const SCHEMA = [
   { section: 'set.display' },
   { key: 'showStats', label: 'set.showStats', type: 'check' },
   { key: 'showCompass', label: 'set.showCompass', type: 'check' },
-  { key: 'showStreetNames', label: 'set.showStreetNames', type: 'check', hint: 'set.showStreetNames.hint' },
   { key: 'compassCorner', label: 'set.compassCorner', type: 'select',
     options: () => Object.fromEntries(['tl', 'tr', 'bl', 'br'].map((c) => [c, t(`corner.${c}`)])) },
+  { key: 'showStreetNames', label: 'set.showStreetNames', type: 'check', hint: 'set.showStreetNames.hint' },
+  { key: 'streetNamesHeight', label: 'set.streetNamesHeight', type: 'range', min: 1, max: 50, step: 0.5,
+    fmt: (v) => `${v.toLocaleString(locale(), { minimumFractionDigits: 1 })} m` },
   { section: 'set.graphics' },
   { key: 'range', label: 'set.range', type: 'range', min: 1, max: 7, step: 1,
     fmt: (v) => t('set.range.fmt', { a: km((v + 0.5) * CHUNK_M), b: km(viewDistance(v)) }), hint: 'set.range.hint' },

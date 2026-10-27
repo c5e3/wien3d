@@ -1,15 +1,21 @@
 import * as THREE from 'three';
 import { lonLatToWorld, worldToLonLat } from './geo.js';
 
-// Street names from the Stadt Wien street graph (GIP), as flat white text boxes lying 1 m above the terrain
-// along the street. Loaded around the player; segments of a street are joined into chains, which get a label
-// every SPACING m. The text turns in the shader so it never reads upside down.
+// Street names from the Stadt Wien street graph (GIP), as flat white text boxes floating a set height above the
+// terrain along the street. Loaded around the player; segments of a street are joined into chains, which get a
+// label every SPACING m, kept straight, off buildings and clear of each other. The text turns in the shader so
+// it never reads upside down.
 const WFS =
   'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json&typeName=ogdwien:STRASSENGRAPHOGD';
-const HOVER = 1; // m above the terrain
 const SPACING = 400; // m between labels along a street
 const DEDUP = 150; // m: no second label of the same name this close (dual carriageways, crossings)
 const STEP = 5; // m: terrain sample spacing along a label
+const SLIDE = 8, SLIDE_MAX = 80; // m: a blocked label tries spots up to this far apart along its street, up to this far
+const SHRINK = 0.8, MIN_H = 2; // a label that doesn't fit anywhere tries again this much smaller, down to this box height (m)
+const BENT = 0.35; // share of the box height the street may bend away from the box
+const MARGIN = 1.5; // m kept free between two labels
+const CELL = 64; // m: spatial hash of placed labels
+const RELAYOUT = 2; // s: at most this often re-place labels after buildings loaded
 const PAGE = 2048; // atlas page size (px)
 const FONT_PX = 32, ROW = 44, PAD = 14, GAP = 4; // text, box height, inner padding, gap between boxes
 const FONT = `600 ${FONT_PX}px 'Open Sans Variable', 'Helvetica Neue', 'Segoe UI', sans-serif`;
@@ -105,17 +111,39 @@ function pointAt(pts, cum, s) {
   return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t];
 }
 
+/** Largest distance of the polyline between s0 and s1 from the straight line a-b (unit direction d). */
+function bend(pts, cum, s0, s1, a, d) {
+  let m = 0;
+  for (let i = 0; i < pts.length; i++)
+    if (cum[i] > s0 && cum[i] < s1) m = Math.max(m, Math.abs((pts[i][0] - a[0]) * d[1] - (pts[i][1] - a[1]) * d[0]));
+  return m;
+}
+
+/** Oriented rectangles (centre, unit direction, half length / height) overlap, separating axis test. */
+function overlaps(p, q) {
+  const tx = q.cx - p.cx, tz = q.cz - p.cz;
+  for (const [ux, uz] of [[p.dx, p.dz], [-p.dz, p.dx], [q.dx, q.dz], [-q.dz, q.dx]]) {
+    const r = (o) => o.hl * Math.abs(o.dx * ux + o.dz * uz) + o.hh * Math.abs(-o.dz * ux + o.dx * uz);
+    if (Math.abs(tx * ux + tz * uz) > r(p) + r(q)) return false;
+  }
+  return true;
+}
+
 export class StreetNames {
-  constructor({ scene, terrain, player, renderer }) {
+  constructor({ scene, terrain, player, chunks, renderer }) {
     this.scene = scene;
     this.terrain = terrain;
     this.player = player;
+    this.chunks = chunks; // building footprints (chunks.collision) and their revision (chunks.rev)
     this.maxAniso = renderer.capabilities.getMaxAnisotropy();
     this.range = 2600;
+    this.hover = 1; // m above the terrain, settings.streetNamesHeight
     this.on = false;
+    this.data = null; // { slots, pages }: the loaded streets, laid out again whenever buildings arrive
     this.meshes = [];
     this.center = null;
     this.t = 0;
+    this.layoutT = 0;
   }
 
   radius() {
@@ -128,7 +156,7 @@ export class StreetNames {
     if (on) this.load();
     else {
       this.abort?.abort();
-      this.clear();
+      this.setData(null);
       this.center = null;
     }
   }
@@ -140,14 +168,28 @@ export class StreetNames {
     if (this.on && this.center) this.load();
   }
 
-  clear() {
+  /** Height of the labels above the terrain in metres. */
+  setHeight(m) {
+    if (this.hover === m) return;
+    this.hover = m;
+    this.layout();
+  }
+
+  clearMeshes() {
     for (const m of this.meshes) {
       this.scene.remove(m);
       m.geometry.dispose();
-      m.material.map.dispose();
-      m.material.dispose();
     }
     this.meshes = [];
+  }
+
+  setData(data) {
+    this.clearMeshes();
+    for (const p of this.data?.pages ?? []) {
+      p.material.map.dispose();
+      p.material.dispose();
+    }
+    this.data = data;
   }
 
   async load() {
@@ -164,13 +206,15 @@ export class StreetNames {
         document.fonts.load(FONT),
       ]);
       if (abort.signal.aborted) return;
-      this.build(j.features || []);
+      this.setData(this.prepare(j.features || []));
+      this.layout();
     } catch (e) {
       if (e.name !== 'AbortError') console.warn('street names', e);
     }
   }
 
-  build(features) {
+  /** Streets joined into chains and cut into label slots; one atlas texture per page. */
+  prepare(features) {
     const byName = new Map();
     for (const f of features) {
       const name = f.properties.FEATURENAME?.trim(), g = f.geometry;
@@ -179,34 +223,94 @@ export class StreetNames {
       (byName.get(name) ?? byName.set(name, []).get(name)).push(seg);
     }
     const { pages, entries } = buildAtlas([...byName.keys()]);
-
-    // label placements: centre, text direction, size, atlas entry
-    const labels = [];
-    for (const [name, segs] of byName) {
-      const e = entries.get(name), placed = [];
-      // longest chains first, so the de-duplication keeps the better spots
-      const cs = chains(segs).map((c) => {
+    const slots = [];
+    for (const [name, segs] of byName)
+      for (const c of chains(segs)) {
         const cum = [0];
         for (let i = 1; i < c.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(c.pts[i][0] - c.pts[i - 1][0], c.pts[i][1] - c.pts[i - 1][1]));
-        return { ...c, cum, len: cum.at(-1) };
-      });
-      for (const c of cs.sort((a, b) => b.len - a.len)) {
-        const h = boxHeight(c.frc), L = h * e.aspect;
-        if (c.len < L * 1.05) continue;
-        const n = Math.max(1, Math.floor(c.len / SPACING));
-        for (let i = 0; i < n; i++) {
-          const s = (c.len * (i + 0.5)) / n;
-          const [cx, cz] = pointAt(c.pts, c.cum, s);
-          if (placed.some((q) => Math.hypot(q[0] - cx, q[1] - cz) < DEDUP)) continue;
-          const a = pointAt(c.pts, c.cum, s - L / 2), b = pointAt(c.pts, c.cum, s + L / 2);
-          const dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-          placed.push([cx, cz]);
-          labels.push({ cx, cz, dx: (b[0] - a[0]) / dl, dz: (b[1] - a[1]) / dl, L, h, e });
-        }
+        const chain = { ...c, cum, len: cum.at(-1), name, e: entries.get(name) };
+        const n = Math.max(1, Math.floor(chain.len / SPACING));
+        for (let i = 0; i < n; i++) slots.push({ chain, s: (chain.len * (i + 0.5)) / n, win: Math.min(SLIDE_MAX, chain.len / n / 2) });
       }
+    // major roads and long streets choose their spots first
+    slots.sort((a, b) => a.chain.frc - b.chain.frc || b.chain.len - a.chain.len);
+    return {
+      slots,
+      pages: pages.map((canvas) => {
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = this.maxAniso;
+        return { material: labelMaterial(tex) };
+      }),
+    };
+  }
+
+  /** Nearest spot to the slot that is straight enough, off buildings and clear of other labels, or null. */
+  place(slot, grid, named) {
+    const c = slot.chain, { pts, cum, e } = c;
+    const H = boxHeight(c.frc);
+    for (let h = H; h >= Math.min(H, MIN_H); h *= SHRINK) {
+      const L = h * e.aspect, step = Math.min(SLIDE, L / 4); // finer steps for small labels on short streets
+      if (c.len < L * 1.05) continue;
+      for (let k = 0; k * step <= slot.win; k++)
+        for (const sign of k ? [1, -1] : [1]) {
+          const s = slot.s + sign * k * step;
+          if (s - L / 2 < 0 || s + L / 2 > c.len) continue;
+          const a = pointAt(pts, cum, s - L / 2), b = pointAt(pts, cum, s + L / 2);
+          const dl = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          if (dl < L * 0.9) continue; // too curvy here
+          const d = [(b[0] - a[0]) / dl, (b[1] - a[1]) / dl];
+          if (bend(pts, cum, s - L / 2, s + L / 2, a, d) > h * BENT) continue;
+          const r = { cx: (a[0] + b[0]) / 2, cz: (a[1] + b[1]) / 2, dx: d[0], dz: d[1], hl: dl / 2, hh: h / 2, L: dl, h, e };
+          if (named.get(c.name)?.some((q) => Math.hypot(q.cx - r.cx, q.cz - r.cz) < DEDUP)) return null;
+          if (this.hitsLabel(r, grid) || this.hitsBuilding(r)) continue;
+          return r;
+        }
+    }
+    return null;
+  }
+
+  hitsLabel(r, grid) {
+    const grow = (o) => ({ ...o, hl: o.hl + MARGIN / 2, hh: o.hh + MARGIN / 2 });
+    const p = grow(r), R = Math.hypot(p.hl, p.hh);
+    for (let ix = Math.floor((r.cx - R) / CELL); ix <= Math.floor((r.cx + R) / CELL); ix++)
+      for (let iz = Math.floor((r.cz - R) / CELL); iz <= Math.floor((r.cz + R) / CELL); iz++)
+        for (const q of grid.get(`${ix},${iz}`) ?? []) if (overlaps(p, grow(q))) return true;
+    return false;
+  }
+
+  /** The box, as a row of circles along it, cuts through a building (not one passing above or ending below it). */
+  hitsBuilding(r) {
+    const rad = r.hh * 0.9, n = Math.max(1, Math.ceil((r.L - 2 * rad) / rad));
+    for (let i = 0; i <= n; i++) {
+      const t = -r.hl + rad + ((r.L - 2 * rad) * i) / n;
+      const x = r.cx + r.dx * t, z = r.cz + r.dz * t;
+      const g = this.terrain.heightAt(x, z) ?? 170;
+      const y = g + this.hover;
+      if (this.chunks.collision.query(x, z, rad).some((p) => p.bottom < y + 2 && p.top > y - 0.5)) return true;
+    }
+    return false;
+  }
+
+  layout() {
+    if (!this.data) return;
+    this.layoutRev = this.chunks.rev;
+    const { slots, pages } = this.data;
+    const grid = new Map(), named = new Map(), labels = [];
+    for (const slot of slots) {
+      const r = this.place(slot, grid, named);
+      if (!r) continue;
+      labels.push(r);
+      (named.get(slot.chain.name) ?? named.set(slot.chain.name, []).get(slot.chain.name)).push(r);
+      const R = Math.hypot(r.hl, r.hh) + MARGIN;
+      for (let ix = Math.floor((r.cx - R) / CELL); ix <= Math.floor((r.cx + R) / CELL); ix++)
+        for (let iz = Math.floor((r.cz - R) / CELL); iz <= Math.floor((r.cz + R) / CELL); iz++) {
+          const k = `${ix},${iz}`;
+          (grid.get(k) ?? grid.set(k, []).get(k)).push(r);
+        }
     }
 
-    // one mesh per atlas page: a strip per label, every vertex on the terrain + HOVER
+    // one mesh per atlas page: a strip per label, every vertex on the terrain + hover
     const geo = pages.map(() => ({ pos: [], uv: [], rect: [], dir: [], idx: [] }));
     for (const { cx, cz, dx, dz, L, h, e } of labels) {
       const g = geo[e.page], [u0, v0, u1, v1] = e.rect;
@@ -216,7 +320,7 @@ export class StreetNames {
         const t = i / k, px = cx + dx * (t - 0.5) * L, pz = cz + dz * (t - 0.5) * L;
         for (const [side, v] of [[-0.5, v0], [0.5, v1]]) {
           const x = px + nx * side * h, z = pz + nz * side * h;
-          g.pos.push(x, (this.terrain.heightAt(x, z) ?? 170) + HOVER, z);
+          g.pos.push(x, (this.terrain.heightAt(x, z) ?? 170) + this.hover, z);
           g.uv.push(u0 + (u1 - u0) * t, v);
           g.rect.push(u0, v0, u1, v1);
           g.dir.push(dx, dz);
@@ -228,8 +332,8 @@ export class StreetNames {
       }
     }
 
-    this.clear();
-    pages.forEach((canvas, i) => {
+    this.clearMeshes();
+    pages.forEach((page, i) => {
       const g = geo[i];
       if (!g.idx.length) return;
       const bg = new THREE.BufferGeometry();
@@ -239,11 +343,8 @@ export class StreetNames {
       bg.setAttribute('aDir', new THREE.Float32BufferAttribute(g.dir, 2));
       bg.setIndex(g.idx);
       bg.computeBoundingSphere();
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = this.maxAniso;
-      const mesh = new THREE.Mesh(bg, labelMaterial(tex));
-      mesh.renderOrder = 1; // after the opaque scene, before nothing else in particular
+      const mesh = new THREE.Mesh(bg, page.material);
+      mesh.renderOrder = 1;
       this.scene.add(mesh);
       this.meshes.push(mesh);
     });
@@ -255,9 +356,15 @@ export class StreetNames {
     const m = camera.matrixWorld.elements;
     if (Math.hypot(m[0], m[2]) > 1e-3) labelRight.value.set(m[0], m[2]);
     this.t += dt;
+    this.layoutT += dt;
     if (this.t < 1) return;
     this.t = 0;
     const p = this.player.pos;
     if (this.center && Math.hypot(p.x - this.center.x, p.z - this.center.z) > this.radius() * 0.4) this.load();
+    // buildings were loaded or unloaded: place the labels around them again
+    else if (this.data && this.chunks.rev !== this.layoutRev && this.layoutT >= RELAYOUT) {
+      this.layoutT = 0;
+      this.layout();
+    }
   }
 }
