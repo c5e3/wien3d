@@ -62,10 +62,10 @@ Pinching covers a share of the distance to the target, so far things come quickl
 | Button | What it does |
 | --- | --- |
 | Left / right stick | move / look |
-| `RB` (or `A`) · `LB` | fly up · fly down |
+| `RT` (or `A`) · `LT` | fly up · fly down (press gently to climb / sink slowly) |
 | `L3` | sprint |
-| `RT` | info about what the crosshair points at |
-| `LT` (or `B`) | close the info box, POI list or settings |
+| `RB` | info about what the crosshair points at |
+| `LB` (or `B`) | close the info box, POI list or settings |
 | `Y` | noclip |
 | D-pad ▲ ▼ | speed multiplier |
 | D-pad ◀ ▶ | previous / next landmark |

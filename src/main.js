@@ -284,22 +284,22 @@ const touch = new TouchControls(renderer.domElement, {
   onTwoFingerTap: () => player.active && escape(),
 });
 
-// controller: Start = menu, RT = info, LT / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
-// Back = stats, d-pad left/right = previous/next landmark (A/RB/LB fly up and down, see gamepad.js)
+// controller: Start = menu, RB = info, LB / B = close/back, Y = noclip, d-pad up/down = speed, LS click = sprint,
+// Back = stats, d-pad left/right = previous/next landmark (A/RT/LT fly up and down, see gamepad.js)
 const gamepads = new Gamepads(player);
 gamepads.onPress = (b) => {
   if (settings.open) {
-    if (b === BTN.B || b === BTN.LT || b === BTN.START) closeSettings();
+    if (b === BTN.B || b === BTN.LB || b === BTN.START) closeSettings();
   } else if (legalOpen()) {
-    if (b === BTN.B || b === BTN.LT || b === BTN.START) closeLegal();
+    if (b === BTN.B || b === BTN.LB || b === BTN.START) closeLegal();
   } else if (pois.open) {
-    if (b === BTN.B || b === BTN.LT || b === BTN.START) closePois();
+    if (b === BTN.B || b === BTN.LB || b === BTN.START) closePois();
   } else if (menuOpen() || mouseMode) {
     enterPlay(); // any button
   } else if (player.active) {
     if (b === BTN.START) showMenu();
-    else if (b === BTN.RT) info.click();
-    else if (b === BTN.LT || b === BTN.B) info.close();
+    else if (b === BTN.RB) info.click();
+    else if (b === BTN.LB || b === BTN.B) info.close();
     else if (b === BTN.Y) player.toggleNoclip();
     else if (b === BTN.UP || b === BTN.DOWN) player.changeSpeed(b === BTN.UP ? 1 : -1);
     else if (b === (gamepads.swapSticks ? BTN.RS : BTN.LS)) player.sprinting = true; // click the moving stick
@@ -350,7 +350,7 @@ function controlText(key) {
   if (key === 'pad.1')
     return [key, { move: s.padSwapSticks ? 'R' : 'L', look: s.padSwapSticks ? 'L' : 'R', inv: s.padInvertY ? tText('pad.inverted') : '' }];
   if (key === 'pad.2')
-    return [key, { up: s.padSwapUpDown ? 'LB' : 'RB', down: s.padSwapUpDown ? 'RB' : 'LB', sprint: s.padSwapSticks ? 'R3' : 'L3' }];
+    return [key, { up: s.padSwapUpDown ? 'LT' : 'RT', down: s.padSwapUpDown ? 'RT' : 'LT', sprint: s.padSwapSticks ? 'R3' : 'L3' }];
   return [key];
 }
 for (const [k, v] of Object.entries(settings.values)) applySetting(k, v);
