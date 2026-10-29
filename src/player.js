@@ -11,6 +11,8 @@ const SPEED = Object.fromEntries(Object.entries({ fly: 10.92, flySprint: 21.78, 
 export const SPEED_STEPS = [1, 2, 4, 8, 16, 32, 64];
 const DOUBLE_TAP = 300;
 const EPS = 1e-3;
+// keys that would otherwise scroll the page or move focus
+const NO_DEFAULT = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown']);
 
 // height of a prism's top at (x, z): flat, or a sloped roof plane clamped to the triangle's height range
 const topAt = (q, x, z) => (q.plane ? Math.min(q.top, Math.max(q.minTop, q.plane[0] * x + q.plane[1] * z + q.plane[2])) : q.top);
@@ -69,10 +71,10 @@ export class Player {
     );
     document.addEventListener('keydown', (e) => {
       if (!this.active) return;
-      if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
+      if (NO_DEFAULT.has(e.code)) e.preventDefault();
       if (!e.repeat) {
         const now = performance.now();
-        if (e.code === 'KeyW') {
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') {
           if (now - this.lastW < DOUBLE_TAP) this.sprinting = true;
           this.lastW = now;
         }
@@ -157,11 +159,12 @@ export class Player {
     const k = this.keys;
     const pad = this.pad, tv = this.touchVel;
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
-    const fwd = clamp1((k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) + pad.fwd);
-    const str = clamp1((k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) + pad.str);
+    const key = (...codes) => (codes.some((c) => k.has(c)) ? 1 : 0);
+    const fwd = clamp1(key('KeyW', 'ArrowUp') - key('KeyS', 'ArrowDown') + pad.fwd);
+    const str = clamp1(key('KeyD', 'ArrowRight') - key('KeyA', 'ArrowLeft') + pad.str);
     if (fwd <= 0) this.sprinting = false;
-    const upAmt = Math.max(k.has('Space') ? 1 : 0, pad.up);
-    const downAmt = Math.max(k.has('ShiftLeft') || k.has('ShiftRight') ? 1 : 0, pad.down);
+    const upAmt = Math.max(key('Space', 'PageUp'), pad.up);
+    const downAmt = Math.max(key('ShiftLeft', 'ShiftRight', 'PageDown'), pad.down);
 
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     let wx = -sin * fwd + cos * str;

@@ -32,9 +32,9 @@ Click or tap anywhere, press any key or any controller button, and off you go.
 
 | Key | What it does |
 | --- | --- |
-| `W` `A` `S` `D` + mouse | fly & look around |
-| `Space` · `Shift` | fly up · fly down |
-| `W` `W` (double-tap) or `R` | sprint |
+| `W` `A` `S` `D` or arrow keys + mouse | fly & look around |
+| `Space` / `Page Up` · `Shift` / `Page Down` | fly up · fly down |
+| `W` `W` / `↑` `↑` (double-tap) or `R` | sprint |
 | Mouse wheel | speed multiplier |
 | `N` | noclip (ghost through walls) |
 | `1` – `9` | teleport to a landmark (Stephansdom, Prater, Schönbrunn, …), also straight from the start window |
