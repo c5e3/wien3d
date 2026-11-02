@@ -10,8 +10,21 @@ import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
+const _sphere = new THREE.Sphere();
+/** Builds the BVH on the first ray that can actually reach the mesh, so chunks passed at speed never pay for it. */
+function lazyRaycast(raycaster, hits) {
+  const g = this.geometry;
+  if (!g.boundsTree) {
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    _sphere.copy(g.boundingSphere).applyMatrix4(this.matrixWorld);
+    if (raycaster.ray.origin.distanceTo(_sphere.center) - _sphere.radius > raycaster.far) return;
+    if (!raycaster.ray.intersectsSphere(_sphere)) return;
+    g.computeBoundsTree();
+  }
+  acceleratedRaycast.call(this, raycaster, hits);
+}
 function pickable(mesh, kind) {
-  mesh.geometry.computeBoundsTree();
+  mesh.raycast = lazyRaycast;
   mesh.userData.pick = kind;
   return mesh;
 }
@@ -57,6 +70,39 @@ class Scheduler {
           this.pump();
         });
     }
+  }
+}
+
+/**
+ * Mesh building for downloaded chunks, run from requestAnimationFrame within a per-frame time budget (nearest
+ * first, at least one job per frame), so tiles arriving together don't stall a single frame.
+ */
+class BuildQueue {
+  constructor(budgetMs) {
+    this.budget = budgetMs;
+    this.jobs = [];
+    this.raf = 0;
+  }
+  add(chunk, run) {
+    this.jobs.push({ chunk, run });
+    this.raf ||= requestAnimationFrame(() => this.pump());
+  }
+  pump() {
+    this.raf = 0;
+    const t0 = performance.now();
+    do {
+      this.jobs = this.jobs.filter((j) => !j.chunk.disposed);
+      if (!this.jobs.length) return;
+      let bi = 0;
+      for (let i = 1; i < this.jobs.length; i++) if (this.jobs[i].chunk.dist < this.jobs[bi].chunk.dist) bi = i;
+      const j = this.jobs.splice(bi, 1)[0];
+      try {
+        j.run();
+      } catch (e) {
+        console.warn(e);
+      }
+    } while (performance.now() - t0 < this.budget);
+    if (this.jobs.length) this.raf = requestAnimationFrame(() => this.pump());
   }
 }
 
@@ -334,6 +380,11 @@ class Chunk {
       this.mgr.terrain.ensure(this.b),
     ]);
     await structuresReady;
+    // the network slot is released now; the meshes get built when the build queue gets to us
+    if (!signal.aborted) this.mgr.builds.add(this, () => this.buildBuildings(bk, trees, l2, signal));
+  }
+
+  buildBuildings(bk, trees, l2, signal) {
     if (signal.aborted) return;
     const g = new THREE.Group();
     const lod2 = buildLod2(l2, this.b);
@@ -393,6 +444,7 @@ export class ChunkManager {
     this.sGround = new Scheduler(4);
     this.sTex = new Scheduler(6);
     this.sNet = new Scheduler(3);
+    this.builds = new BuildQueue(8);
     this.stats = { buildings: 0 };
     this.rev = 0;
     this.center = null;
@@ -412,7 +464,7 @@ export class ChunkManager {
   }
 
   get pending() {
-    return this.sGround.pending + this.sTex.pending + this.sNet.pending;
+    return this.sGround.pending + this.sTex.pending + this.sNet.pending + this.builds.jobs.length;
   }
 
   /** Loaded chunks whose tile overlaps the square (x, z) ± pad. */
