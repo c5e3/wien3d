@@ -4,3 +4,6 @@ dist
 
 # backup of the Wiener Linien live data feature (see wienerlinien/README.md)
 wienerlinien/
+
+# server-specific nginx site (kept out of the repo)
+deploy/wien3d.nginx.conf
