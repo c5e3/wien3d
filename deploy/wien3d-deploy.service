@@ -1,0 +1,14 @@
+[Unit]
+Description=Wien 3D: build and deploy new commits from GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=wien3d
+Group=wien3d
+ExecStart=/srv/wien3d/repo/deploy/deploy.sh
+# "+" runs this as root, so the unprivileged deploy user can't do more than ask for a restart
+ExecStartPost=+/bin/sh -c 'if [ -e /srv/wien3d/restart-api ]; then rm /srv/wien3d/restart-api; systemctl restart wien3d-api.service; fi'
+Nice=10
+TimeoutStartSec=15min

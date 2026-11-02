@@ -1,0 +1,21 @@
+[Unit]
+Description=Wien 3D: LOD2 roof model server (/api/lod2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=wien3d
+Group=wien3d
+WorkingDirectory=/srv/wien3d/repo
+Environment=PORT=3017 LOD2_CACHE=/srv/wien3d/cache/lod2
+ExecStart=/opt/node/bin/node server/serve.js
+Restart=on-failure
+MemoryMax=1G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/wien3d/cache
+
+[Install]
+WantedBy=multi-user.target

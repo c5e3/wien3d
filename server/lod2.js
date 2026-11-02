@@ -1,6 +1,7 @@
 // Converts one sheet of Vienna's generalised roof model (LOD2.1, CityGML, OGD CC BY 4.0)
 // into a compact gzipped binary of triangulated roofs and walls.
-// Used by the Vercel function (api/lod2/[sheet].js) and the Vite dev server (vite.config.js).
+// Used by the Vercel function (api/lod2/[sheet].js), the Vite dev server (vite.config.js)
+// and the self-hosted server (server/serve.js).
 //
 // Binary layout (little endian):
 //   char[4] 'L2V1' | u32 buildingCount | u32 vertexCount | f64 lon0 | f64 lat0
