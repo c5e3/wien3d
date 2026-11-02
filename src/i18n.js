@@ -58,11 +58,11 @@ const STRINGS = {
       '<p><b>Lokaler Speicher:</b> Deine Einstellungen (z. B. Sprache, Sichtweite) und welche POI-Gruppen aufgeklappt sind, werden nur im lokalen Speicher deines Browsers abgelegt und nie übertragen. Du kannst sie jederzeit löschen, indem du die Websitedaten in deinem Browser entfernst.</p>' +
       '<p><b>Technisch notwendige Verbindungen:</b> Damit die Karte funktioniert, lädt dein Browser Daten direkt von folgenden Servern. Dabei wird, wie bei jedem Webseitenaufruf, deine IP-Adresse an den jeweiligen Anbieter übermittelt:</p>' +
       '<ul>' +
-      '<li><b>Vercel Inc.</b> (USA): Hosting dieser Website. Vercel verarbeitet Zugriffsdaten (IP-Adresse, Zeitpunkt, aufgerufene Datei, Browserkennung) zur Auslieferung und Absicherung des Dienstes.</li>' +
+      '<li><b>Hetzner Online GmbH</b> (Deutschland): Rechenzentrum des Servers, auf dem ich diese Website selbst betreibe. Der Server protokolliert Zugriffsdaten (IP-Adresse, Zeitpunkt, aufgerufene Datei, Browserkennung) zur Auslieferung und Absicherung des Dienstes und löscht diese Protokolle automatisch nach 14 Tagen.</li>' +
       '<li><b>Stadt Wien</b> (data.wien.gv.at, mapsneu.wien.gv.at): Gebäude-, Baum- und POI-Daten, die Adresssuche (der eingegebene Suchtext) sowie Orthofotos (basemap.at).</li>' +
       '<li><b>Amazon Web Services Inc.</b> (USA, s3.amazonaws.com): Geländehöhen (AWS Terrain Tiles).</li>' +
       '</ul>' +
-      '<p>Rechtsgrundlage ist mein berechtigtes Interesse an der Bereitstellung einer funktionierenden Website (Art. 6 Abs. 1 lit. f DSGVO). Die Übermittlung in die USA an Vercel und AWS erfolgt auf Grundlage des EU-US Data Privacy Framework (Art. 45 DSGVO). Ich selbst werte keine Zugriffsdaten aus. Die Anbieter speichern sie nach ihren eigenen Datenschutzbestimmungen nur so lange, wie es für Betrieb und Sicherheit nötig ist.</p>' +
+      '<p>Rechtsgrundlage ist mein berechtigtes Interesse an der Bereitstellung einer funktionierenden Website (Art. 6 Abs. 1 lit. f DSGVO). Die Übermittlung in die USA an AWS erfolgt auf Grundlage des EU-US Data Privacy Framework (Art. 45 DSGVO). Ich selbst werte keine Zugriffsdaten aus. Die übrigen Anbieter speichern sie nach ihren eigenen Datenschutzbestimmungen nur so lange, wie es für Betrieb und Sicherheit nötig ist.</p>' +
       '<p>Externe Links (z. B. zu GitHub) werden erst geöffnet, wenn du sie anklickst.</p>' +
       '<p><b>Deine Rechte:</b> Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Widerspruch (Art. 15–21 DSGVO). Schreib mir dazu einfach eine E-Mail. Außerdem kannst du dich bei der österreichischen Datenschutzbehörde beschweren (<a href="https://www.dsb.gv.at" target="_blank" rel="noopener">dsb.gv.at</a>).</p>',
 
@@ -250,11 +250,11 @@ const STRINGS = {
       '<p><b>Local storage:</b> your settings (e.g. language, render distance) and which POI groups are expanded are kept only in your browser’s local storage and are never transmitted. You can delete them at any time by clearing this site’s data in your browser.</p>' +
       '<p><b>Technically necessary connections:</b> for the map to work, your browser loads data directly from the following servers. As with any website visit, your IP address is transmitted to the respective provider:</p>' +
       '<ul>' +
-      '<li><b>Vercel Inc.</b> (USA): hosting of this website. Vercel processes access data (IP address, time, requested file, browser identifier) to deliver and secure the service.</li>' +
+      '<li><b>Hetzner Online GmbH</b> (Germany): data centre of the server I run this website on myself. The server logs access data (IP address, time, requested file, browser identifier) to deliver and secure the service and deletes these logs automatically after 14 days.</li>' +
       '<li><b>City of Vienna</b> (data.wien.gv.at, mapsneu.wien.gv.at): building, tree and POI data, the address search (the text you type) as well as orthophotos (basemap.at).</li>' +
       '<li><b>Amazon Web Services Inc.</b> (USA, s3.amazonaws.com): terrain elevation (AWS Terrain Tiles).</li>' +
       '</ul>' +
-      '<p>The legal basis is my legitimate interest in providing a working website (Art. 6(1)(f) GDPR). Transfers to Vercel and AWS in the USA are based on the EU-US Data Privacy Framework (Art. 45 GDPR). I do not analyse any access data myself. The providers keep it under their own privacy policies only as long as needed for operation and security.</p>' +
+      '<p>The legal basis is my legitimate interest in providing a working website (Art. 6(1)(f) GDPR). Transfers to AWS in the USA are based on the EU-US Data Privacy Framework (Art. 45 GDPR). I do not analyse any access data myself. The other providers keep it under their own privacy policies only as long as needed for operation and security.</p>' +
       '<p>External links (e.g. to GitHub) are only opened when you click them.</p>' +
       '<p><b>Your rights:</b> you have the right of access, rectification, erasure, restriction of processing and objection (Art. 15–21 GDPR). Just send me an email. You can also lodge a complaint with the Austrian Data Protection Authority (<a href="https://www.dsb.gv.at" target="_blank" rel="noopener">dsb.gv.at</a>).</p>',
 

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import { convertSheet, SHEET_RE } from './server/lod2.js';
 
-// Dev-server twin of api/lod2/[sheet].js, with a disk cache in .cache/lod2.
+// Dev-server twin of server/serve.js, with a disk cache in .cache/lod2.
 function lod2Dev() {
   const dir = path.resolve('.cache/lod2');
   const pending = new Map();
@@ -32,7 +32,7 @@ function lod2Dev() {
   };
 }
 
-// Imprint details from the environment (Vercel env vars, or a local .env), so they stay out of the repo.
+// Imprint details from the environment (/srv/wien3d/.env on the server, or a local .env), so they stay out of the repo.
 // The contact address is XOR-scrambled (main.js unscrambles it) so the bundle doesn't hold it as text.
 function imprint(env) {
   const html = (s = '') => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

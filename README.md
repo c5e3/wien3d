@@ -111,9 +111,7 @@ npm run dev
 
 Then open the URL Vite prints and click anywhere to play. That's it! 🎉
 
-`npm run build` makes a production build in `dist/`. It deploys to Vercel as-is: `api/lod2/[sheet].js` is a small serverless function that converts the city's roof model to a compact binary on the fly (the Vite dev server does the same thing locally).
-
-To self-host it instead, `server/serve.js` is the same function as a tiny Node server, and `deploy/` has the nginx site, systemd units and a script that builds and deploys every new commit on `main` (it runs at [wien3d.c5e3.eu](https://wien3d.c5e3.eu)).
+`npm run build` makes a production build in `dist/`. The roof model is converted to a compact binary on the fly by `server/serve.js`, a tiny Node server behind nginx (the Vite dev server does the same thing locally). `deploy/` has the nginx site, systemd units and a script that builds and deploys every new commit on `main` (it runs at [wien3d.c5e3.eu](https://wien3d.c5e3.eu)).
 
 Optional data prep scripts (the results are already committed in `public/data/`):
 

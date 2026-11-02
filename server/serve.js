@@ -1,4 +1,4 @@
-// Production twin of api/lod2/[sheet].js for self-hosting (see deploy/): a tiny HTTP server behind nginx
+// Production server for the roof model (see deploy/): a tiny HTTP server behind nginx
 // that answers GET /api/lod2/:sheet, with a disk cache like the Vite dev server.
 //   PORT (default 3017), HOST (default 127.0.0.1), LOD2_CACHE (default .cache/lod2)
 
